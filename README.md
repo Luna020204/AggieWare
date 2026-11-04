@@ -6,11 +6,11 @@ ECS 179 group project.
 
 ## Godot version
 
-**Godot 4.7** (GL Compatibility renderer, for web export). Everyone on the team must use the same version, or project files will keep conflicting.
+**Godot 4.7.2-stable** (GL Compatibility renderer, for web export). Everyone on the team must use this exact version, or project files will keep conflicting.
 
 ## How to run
 
-1. Install [Godot 4.7](https://godotengine.org/download).
+1. Install [Godot 4.7.2-stable](https://godotengine.org/download/archive/) (standard version, not .NET).
 2. Clone this repository.
 3. In Godot, choose **Import** and select `project.godot`.
 4. Press **F5** to run.
