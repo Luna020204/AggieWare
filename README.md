@@ -69,3 +69,11 @@ _List every outside asset here with its source and license._
 - Press kit: _TBD_
 - Trailer: _TBD_
 - Final graded commit / release: _TBD_
+
+## Character animation (SCRUM-33)
+
+Open `tools/animation_demo.tscn` and press **F6** to preview idle, biking,
+typing/mashing, success, fail, and difficulty-driven playback speed.
+See [integration and test instructions](docs/player_animation_controller.md).
+The included character sheet is original geometric placeholder art; no outside
+assets are used by this component.
