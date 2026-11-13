@@ -12,7 +12,13 @@ config_version=5
 
 config/name="AggieWare"
 config/description="A WarioWare-style microgame gauntlet through a week at UC Davis."
-config/features=PackedStringArray("4.7","GL Compatibility")
+run/main_scene="res://scenes/core/game_flow.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+InputActions="*res://scripts/core/input_actions.gd"
+GameState="*res://scripts/core/game_state.gd"
 
 [display]
 
