@@ -21,6 +21,7 @@ var _drag_offset := Vector2.ZERO
 var _zones: Dictionary = {}
 var _status_label: Label
 var _timer_label: Label
+var _expression_label: Label
 var _rng := RandomNumberGenerator.new()
 
 
@@ -79,6 +80,11 @@ func _build_ui() -> void:
 	_timer_label.add_theme_font_size_override("font_size", 23)
 	_timer_label.add_theme_color_override("font_color", Color("#ffd166"))
 	add_child(_timer_label)
+	_expression_label = Label.new()
+	_expression_label.position = Vector2(340, 182)
+	_expression_label.add_theme_font_size_override("font_size", 25)
+	_expression_label.add_theme_color_override("font_color", Color("#ffd166"))
+	add_child(_expression_label)
 	_status_label = Label.new()
 	_status_label.position = Vector2(48, 635)
 	_status_label.size = Vector2(1180, 44)
@@ -117,7 +123,8 @@ func _start_round() -> void:
 	_seconds_left = DURATIONS[difficulty]
 	_gate_name = GATE_NAMES[_rng.randi_range(0, 1 if difficulty == 0 else 3)]
 	_timer_label.text = "TIME  %.1f s" % _seconds_left
-	_status_label.text = "Build X = %s" % SYMBOLS[_gate_name]
+	_expression_label.text = "BUILD  X = %s" % SYMBOLS[_gate_name]
+	_status_label.text = "Match the gate and inputs before time runs out"
 	for card: Button in _cards:
 		card.queue_free()
 	_cards.clear()

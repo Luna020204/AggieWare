@@ -219,6 +219,9 @@ func _create_file_card(file_name: String, is_target: bool, card_position: Vector
 	card.custom_minimum_size = Vector2(220.0, 52.0)
 	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	card.add_theme_font_size_override("font_size", 18)
+	card.add_theme_color_override("font_color", Color("#152643"))
+	card.add_theme_color_override("font_hover_color", Color("#152643"))
+	card.add_theme_color_override("font_pressed_color", Color("#152643"))
 	card.add_theme_stylebox_override("normal", _panel_style(Color("#f1f5ff"), Color("#9bb4e3")))
 	card.add_theme_stylebox_override("hover", _panel_style(Color("#ffffff"), Color("#73b7ff")))
 	card.set_meta("is_target", is_target)

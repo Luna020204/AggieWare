@@ -19,7 +19,7 @@ func _run() -> void:
 	_assert(flow._hud._progress_label.text == "DAY  1 / 5", "HUD progress is wrong")
 	var canvas: Variant = flow._active_scene
 	_assert(canvas != null and canvas._time_left > 0.0, "Canvas round was not started")
-	canvas._finish_round(true, "Submitted")
+	_submit_canvas(canvas)
 	await create_timer(0.85, false).timeout
 	_assert(flow.state == flow.FlowState.STAGE_CLEAR, "Successful round did not clear stage")
 	_assert(flow.score == 100, "Score did not update")
@@ -84,7 +84,7 @@ func _run() -> void:
 	flow._active_scene._finish_transition()
 	await process_frame
 	_assert(flow.current_stage == 4 and flow._active_scene.name == "CanvasMicrogame", "Friday did not start")
-	flow._active_scene._finish_round(true, "Submitted")
+	_submit_canvas(flow._active_scene)
 	await create_timer(0.85, false).timeout
 	_assert(flow.state == flow.FlowState.STAGE_CLEAR, "Friday did not clear")
 	flow._advance_after_clear()
@@ -97,3 +97,13 @@ func _assert(condition: bool, message: String) -> void:
 	if not condition:
 		push_error(message)
 		quit(1)
+
+
+func _submit_canvas(canvas: Variant) -> void:
+	var file_card: Button = canvas._files[0]
+	file_card.position = canvas._drop_zone.position
+	canvas._dragging_file = file_card
+	canvas._finish_drag()
+	_assert(canvas._placed_file == file_card, "Canvas did not accept file.zip")
+	canvas._on_submit_pressed()
+	_assert(canvas._game_over, "Canvas submit did not finish")

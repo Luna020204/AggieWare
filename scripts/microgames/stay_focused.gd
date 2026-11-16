@@ -54,7 +54,8 @@ func _process(delta: float) -> void:
 		_spawn_clock = 0.0
 		_spawn_thought()
 	for thought: Control in _thoughts.duplicate():
-		thought.position.y += SPEEDS[difficulty] * delta
+		var velocity: Vector2 = thought.get_meta("velocity")
+		thought.position += velocity * delta
 		if thought.get_global_rect().intersects(_shield.get_global_rect()):
 			_blocked += 1
 			_status_label.text = "Blocked %d distractions" % _blocked
@@ -135,6 +136,16 @@ func _start_round() -> void:
 func _spawn_thought() -> void:
 	var thought := PanelContainer.new()
 	thought.position = Vector2(_rng.randf_range(50.0, 1070.0), 245.0)
+	var velocity := Vector2(0.0, SPEEDS[difficulty])
+	if difficulty >= 2:
+		match _rng.randi_range(0, 2):
+			1:
+				thought.position = Vector2(-130.0, 335.0)
+				velocity = Vector2(SPEEDS[difficulty] * 0.8, SPEEDS[difficulty] * 0.7)
+			2:
+				thought.position = Vector2(1250.0, 335.0)
+				velocity = Vector2(-SPEEDS[difficulty] * 0.8, SPEEDS[difficulty] * 0.7)
+	thought.set_meta("velocity", velocity)
 	thought.size = Vector2(160.0, 46.0)
 	thought.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()

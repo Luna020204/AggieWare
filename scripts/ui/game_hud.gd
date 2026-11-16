@@ -60,6 +60,14 @@ func _build_ui() -> void:
 	_timer_bar.show_percentage = false
 	_timer_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_timer_bar.custom_minimum_size.y = 20.0
+	var bar_background := StyleBoxFlat.new()
+	bar_background.bg_color = Color("#0d1324")
+	bar_background.set_corner_radius_all(6)
+	_timer_bar.add_theme_stylebox_override("background", bar_background)
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color("#55d69b")
+	bar_fill.set_corner_radius_all(6)
+	_timer_bar.add_theme_stylebox_override("fill", bar_fill)
 	layout.add_child(_timer_bar)
 
 
