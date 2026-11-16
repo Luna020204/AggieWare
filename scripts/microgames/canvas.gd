@@ -33,6 +33,10 @@ var _submit_button: Button
 var _rng := RandomNumberGenerator.new()
 
 
+func get_round_seconds() -> float:
+	return ROUND_SECONDS[clampi(difficulty, 0, 2)]
+
+
 func _ready() -> void:
 	difficulty = clampi(difficulty, 0, 2)
 	_rng.randomize()

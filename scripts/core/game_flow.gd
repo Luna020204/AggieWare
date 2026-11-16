@@ -13,6 +13,9 @@ enum FlowState { TITLE, STAGE_SELECT, PLAYING, TRANSITION, STAGE_CLEAR, GAME_OVE
 
 const STAGES: Array[String] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
 const CANVAS_SCENE := preload("res://scenes/microgames/canvas.tscn")
+const SCHEDULE_SCENE := preload("res://scenes/microgames/schedule_builder.tscn")
+const FOCUS_SCENE := preload("res://scenes/microgames/stay_focused.tscn")
+const GATES_SCENE := preload("res://scenes/microgames/gates.tscn")
 const BIKE_SCENE := preload("res://scenes/core/bike_transition.tscn")
 const HUD_SCENE := preload("res://scenes/ui/game_hud.tscn")
 
@@ -160,24 +163,51 @@ func _start_stage(stage_index: int) -> void:
 	state = FlowState.PLAYING
 	_center.visible = false
 	_clear_content()
-	var canvas := CANVAS_SCENE.instantiate() as Control
+	var microgame := _scene_for_stage(current_stage).instantiate() as Control
 	# The parent flow already owns the pause overlay. Keep a single copy.
-	var local_pause := canvas.get_node_or_null("SettingsPauseMenu")
+	var local_pause := microgame.get_node_or_null("SettingsPauseMenu")
 	if local_pause != null:
-		canvas.remove_child(local_pause)
+		microgame.remove_child(local_pause)
 		local_pause.free()
-	canvas.set("difficulty", mini(current_stage / 2, 2))
-	canvas.set("show_internal_timer", false)
-	canvas.round_completed.connect(_on_round_completed)
-	canvas.time_changed.connect(_on_round_time_changed)
-	_active_scene = canvas
-	add_child(canvas)
+	microgame.set("difficulty", mini(current_stage / 2, 2))
+	if current_stage == 0 or current_stage == 4:
+		microgame.set("show_internal_timer", false)
+	microgame.connect("round_completed", _on_round_completed)
+	microgame.connect("time_changed", _on_round_time_changed)
+	_active_scene = microgame
+	add_child(microgame)
 	_hud = HUD_SCENE.instantiate() as Control
 	add_child(_hud)
+	current_prompt = _prompt_for_stage(current_stage)
 
 	stage_selected.emit(current_stage)
 	microgame_requested.emit(current_stage)
-	_hud.set_round_status(canvas.ROUND_SECONDS[canvas.difficulty], canvas.ROUND_SECONDS[canvas.difficulty], lives, score, current_stage, STAGES.size())
+	var round_seconds: float = microgame.call("get_round_seconds")
+	_hud.set_round_status(round_seconds, round_seconds, lives, score, current_stage, STAGES.size())
+
+
+func _scene_for_stage(stage_index: int) -> PackedScene:
+	match stage_index:
+		1:
+			return SCHEDULE_SCENE
+		2:
+			return FOCUS_SCENE
+		3:
+			return GATES_SCENE
+		_:
+			return CANVAS_SCENE
+
+
+func _prompt_for_stage(stage_index: int) -> String:
+	match stage_index:
+		1:
+			return "SCHEDULE BUILDER"
+		2:
+			return "STAY FOCUSED"
+		3:
+			return "LOGIC GATES"
+		_:
+			return "CANVAS"
 
 
 func _on_round_time_changed(seconds_left: float, round_seconds: float) -> void:
@@ -209,7 +239,7 @@ func _begin_transition(next_stage_index: int) -> void:
 	state = FlowState.TRANSITION
 	_pending_stage = next_stage_index
 	var bike := BIKE_SCENE.instantiate() as Control
-	bike.set("next_prompt", "CANVAS")
+	bike.set("next_prompt", _prompt_for_stage(next_stage_index))
 	bike.set("lives", lives)
 	bike.set("score", score)
 	bike.transition_finished.connect(_on_transition_finished)

@@ -15,18 +15,24 @@ ECS 179 group project.
 3. In Godot, choose **Import** and select `project.godot`.
 4. Press **F5** to run.
 
-Pressing **F5** now runs the playable week: select a day, complete the Canvas
-upload, view the stage-clear screen, and bike to the next day. The HUD tracks
-the round timer, lives, score, and day progress. Losing all three lives opens
-the game-over screen with a retry action. Individual scenes can also be tested
-by opening them and pressing **F6**:
+Pressing **F5** now runs the playable week: select a day, complete each
+microgame, view the stage-clear screen, and bike to the next day. Monday and
+Friday use Canvas upload, Tuesday uses Schedule Builder, Wednesday uses Stay
+Focused, and Thursday uses Logic Gates. The HUD tracks the round timer, lives,
+score, and day progress. Losing all three lives opens the game-over screen
+with a retry action. Individual scenes can also be tested by opening them and
+pressing **F6**:
 
 - Canvas microgame: `scenes/microgames/canvas.tscn`
+- Schedule Builder: `scenes/microgames/schedule_builder.tscn`
+- Stay Focused: `scenes/microgames/stay_focused.tscn`
+- Logic Gates: `scenes/microgames/gates.tscn`
 - Bike transition: `scenes/core/bike_transition.tscn`
 - Title and stage flow: `scenes/core/game_flow.tscn`
 
 Run `godot --headless --path . --script res://tools/smoke_flow.gd` to check the
-stage-clear, bike-transition, life-loss, and retry paths.
+week flow, microgame outcomes, stage-clear, bike-transition, life-loss, and
+retry paths.
 
 Playable build: _TBD (itch.io link)_
 
