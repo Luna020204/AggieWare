@@ -10,11 +10,13 @@ signal time_changed(seconds_left: float, round_seconds: float)
 const DURATIONS: Array[float] = [8.0, 7.0, 6.0]
 const SPAWN_INTERVALS: Array[float] = [1.3, 0.95, 0.7]
 const SPEEDS: Array[float] = [210.0, 275.0, 335.0]
+const MISS_LIMITS: Array[int] = [4, 3, 2]
 const THOUGHTS: Array[String] = ["PHONE", "SNACK", "SOCIAL MEDIA", "NAP", "TEXTS"]
 
 var _seconds_left := 0.0
 var _spawn_clock := 0.0
 var _blocked := 0
+var _missed := 0
 var _ended := false
 var _shield: PanelContainer
 var _status_label: Label
@@ -58,11 +60,15 @@ func _process(delta: float) -> void:
 		thought.position += velocity * delta
 		if thought.get_global_rect().intersects(_shield.get_global_rect()):
 			_blocked += 1
-			_status_label.text = "Blocked %d distractions" % _blocked
+			_update_status()
 			_remove_thought(thought)
 		elif thought.position.y > 570.0:
-			_finish_round(false, "A thought got through — refocus and try again!")
-			return
+			_missed += 1
+			_remove_thought(thought)
+			_update_status()
+			if _missed >= MISS_LIMITS[difficulty]:
+				_finish_round(false, "Too many distractions — refocus and try again!")
+				return
 	if _seconds_left <= 0.0:
 		_finish_round(true, "Exam complete — you stayed focused!")
 
@@ -123,14 +129,19 @@ func _build_ui() -> void:
 func _start_round() -> void:
 	_ended = false
 	_blocked = 0
+	_missed = 0
 	_seconds_left = DURATIONS[difficulty]
 	_spawn_clock = 0.0
-	_status_label.text = "Block the thoughts until the exam ends"
+	_update_status()
 	_timer_label.text = "EXAM  %.1f s" % _seconds_left
 	for thought: Control in _thoughts:
 		thought.queue_free()
 	_thoughts.clear()
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
+
+
+func _update_status() -> void:
+	_status_label.text = "BLOCKED  %d   MISSED  %d / %d" % [_blocked, _missed, MISS_LIMITS[difficulty]]
 
 
 func _spawn_thought() -> void:

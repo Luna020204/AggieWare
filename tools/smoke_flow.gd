@@ -50,6 +50,10 @@ func _run() -> void:
 	focus._thoughts[0].position = focus._shield.position
 	focus._process(0.01)
 	_assert(focus._blocked == 1, "Shield did not block a thought")
+	focus._spawn_thought()
+	focus._thoughts[0].position = Vector2(0.0, 610.0)
+	focus._process(0.01)
+	_assert(focus._missed == 1 and not focus._ended, "One missed thought ended the round")
 	for index: int in 3:
 		flow._active_scene._finish_round(false, "Time's up")
 		await create_timer(0.85, false).timeout
