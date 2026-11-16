@@ -8,8 +8,10 @@ extends Control
 ## keyboard actions still go through the shared InputActions autoload.
 
 signal round_completed(success: bool)
+signal time_changed(seconds_left: float, round_seconds: float)
 
 @export_range(0, 2, 1) var difficulty: int = 0
+@export var show_internal_timer: bool = true
 
 const ROUND_SECONDS: Array[float] = [10.0, 8.0, 6.0]
 const DECOY_NAMES: Array[String] = ["notes.txt", "lecture.pdf", "draft.zip"]
@@ -36,6 +38,18 @@ func _ready() -> void:
 	_rng.randomize()
 	_build_ui()
 	_start_round()
+	_timer_label.visible = show_internal_timer
+
+
+func _input(event: InputEvent) -> void:
+	# A released mouse button can land outside the source card. Finish the drag
+	# from the scene so the file never stays stuck to the cursor.
+	if _dragging_file != null and event is InputEventMouseMotion:
+		_dragging_file.position = get_global_mouse_position() - _drag_offset
+		get_viewport().set_input_as_handled()
+	elif _dragging_file != null and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		_finish_drag()
+		get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:
@@ -44,6 +58,7 @@ func _process(delta: float) -> void:
 
 	_time_left = maxf(0.0, _time_left - delta)
 	_timer_label.text = "Time: %.1f" % _time_left
+	time_changed.emit(_time_left, ROUND_SECONDS[difficulty])
 	if _time_left <= 0.0:
 		_finish_round(false, "Time's up — try again")
 		return
@@ -173,6 +188,7 @@ func _start_round() -> void:
 	_zone_clock = 0.0
 	_submit_clock = 0.0
 	_timer_label.text = "Time: %.1f" % _time_left
+	time_changed.emit(_time_left, ROUND_SECONDS[difficulty])
 	_status_label.text = ""
 	_status_label.add_theme_color_override("font_color", Color("#c7d5f2"))
 	_drop_zone_label.text = "DROP FILE HERE"
@@ -222,9 +238,6 @@ func _on_file_gui_input(event: InputEvent, card: Control) -> void:
 			if _dragging_file == card:
 				_finish_drag()
 				get_viewport().set_input_as_handled()
-	elif event is InputEventMouseMotion and _dragging_file == card:
-		card.position = get_global_mouse_position() - _drag_offset
-		get_viewport().set_input_as_handled()
 
 
 func _finish_drag() -> void:
