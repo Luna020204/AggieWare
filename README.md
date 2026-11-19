@@ -27,6 +27,9 @@ pressing **F6**:
 - Schedule Builder: `scenes/microgames/schedule_builder.tscn`
 - Stay Focused: `scenes/microgames/stay_focused.tscn`
 - Logic Gates: `scenes/microgames/gates.tscn`
+- Variable Not in Scope (SCRUM-23, Lecture Hall, mouse only): `scenes/microgames/variable_scope.tscn`.
+  It isn't in the week flow yet. Play it from the test launcher (`--microgame=scope`).
+  Smoke test: `godot --headless --path . --script res://tools/smoke_variable_scope.gd`
 - Bike transition: `scenes/core/bike_transition.tscn`
 - Title and stage flow: `scenes/core/game_flow.tscn`
 
@@ -55,7 +58,7 @@ speed, skipping the title and stage flow.
   godot --path . res://scenes/debug/microgame_launcher.tscn -- --microgame=gates --difficulty=2 --speed=1.5
   ```
 
-  Ids: `canvas`, `schedule`, `focus`, `gates`.
+  Ids: `canvas`, `schedule`, `focus`, `gates`, `scope`.
 
 **Adding a microgame:** add one line to `ENTRIES` in
 `scripts/debug/microgame_catalog.gd`. The scene must follow the same contract
