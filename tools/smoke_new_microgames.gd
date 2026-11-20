@@ -14,6 +14,7 @@ func _initialize() -> void:
 func _run() -> void:
 	await _swipe_card()
 	await _stay_awake()
+	await _microscope()
 	if not _failed:
 		print("NEW_MICROGAMES_SMOKE_OK")
 	quit(1 if _failed else 0)
@@ -151,6 +152,79 @@ func _stay_awake() -> void:
 		await process_frame
 		frames += 1
 	_assert(results == [false], "awake: idle round did not end in a fail: %s" % [results])
+	game.queue_free()
+
+
+# --- SCRUM-84 Microscope -------------------------------------------------------
+
+func _microscope() -> void:
+	var scene := "res://scenes/microgames/microscope.tscn"
+	var areas: Array[float] = []
+	var decoys: Array[int] = []
+	var radii: Array[float] = []
+	for difficulty: int in 3:
+		var game := await _spawn(scene, difficulty)
+		var slide: Vector2 = game._slide_size
+		areas.append(slide.x * slide.y)
+		radii.append(game.VIEW_RADII[difficulty])
+		var targets := 0
+		var gold := 0
+		for bug: Dictionary in game._bugs:
+			if bug["kind"] == "aggie":
+				targets += 1
+			elif bug["kind"] == "gold":
+				gold += 1
+		decoys.append(game._bugs.size() - targets)
+		_assert(targets == 1, "microscope: %d targets on the slide" % targets)
+		_assert(game._target_pos.distance_to(game.camera) > game.VIEW_RADII[difficulty], "microscope: target starts in view")
+		if difficulty == 0:
+			_assert(gold == 0, "microscope: gold look-alikes on EASY")
+		game.queue_free()
+	_assert(areas[0] < areas[1] and areas[1] < areas[2], "microscope: slide does not grow")
+	_assert(decoys[0] < decoys[1] and decoys[1] < decoys[2], "microscope: look-alikes do not increase %s" % [decoys])
+	_assert(radii[0] > radii[1] and radii[1] > radii[2], "microscope: view does not shrink")
+
+	# Real arrow-key input pans the view.
+	var game := await _spawn(scene, 1)
+	var results := _watch(game)
+	var start: Vector2 = game.camera
+	Input.action_press(InputActions.ACTION_RIGHT)
+	Input.action_press(InputActions.ACTION_DOWN)
+	for i: int in 10:
+		await process_frame
+	Input.action_release(InputActions.ACTION_RIGHT)
+	Input.action_release(InputActions.ACTION_DOWN)
+	_assert(game.camera.x > start.x and game.camera.y > start.y, "microscope: arrow keys did not pan (%s -> %s)" % [start, game.camera])
+	# ACTION away from the target does nothing; panning onto it and holding wins once.
+	game.confirm()
+	_assert(results.is_empty(), "microscope: confirm off-target ended the round")
+	var guard := 0
+	while game.camera.distance_to(game._target_pos) > 5.0 and guard < 400:
+		game.move_camera((game._target_pos - game.camera).normalized(), minf(0.016, game.camera.distance_to(game._target_pos) / game.PAN_SPEED))
+		guard += 1
+	_assert(game.is_target_in_crosshair(), "microscope: could not reach the target")
+	var frames := 0
+	while results.is_empty() and frames < 200:
+		await process_frame
+		frames += 1
+	_assert(results == [true], "microscope: holding the target did not win: %s" % [results])
+	game.confirm()
+	_assert(results.size() == 1, "microscope: second result after the round ended")
+	game.queue_free()
+
+	# ACTION on the target wins immediately; timeout fails.
+	game = await _spawn(scene, 2)
+	results = _watch(game)
+	game.camera = game._target_pos
+	game.confirm()
+	_assert(results == [true], "microscope: ACTION on target did not win")
+	game.queue_free()
+	game = await _spawn(scene, 0)
+	results = _watch(game)
+	game._seconds_left = 0.01
+	for i: int in 5:
+		await process_frame
+	_assert(results == [false], "microscope: timeout did not fail: %s" % [results])
 	game.queue_free()
 
 
