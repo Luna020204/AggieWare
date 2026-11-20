@@ -12,6 +12,8 @@ var settings: Dictionary = {
 	# SCRUM-41 accessibility (see scripts/core/accessibility.gd).
 	&"timer_assist": 1.0,
 	&"result_cues": true,
+	# SCRUM-57: hold the mash key instead of tapping it repeatedly.
+	&"mash_hold": false,
 }
 
 

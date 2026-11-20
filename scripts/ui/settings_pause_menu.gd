@@ -15,12 +15,20 @@ var _sfx_toggle: CheckButton
 # SCRUM-41 accessibility controls.
 var _timer_assist_option: OptionButton
 var _result_cues_toggle: CheckButton
+# SCRUM-57 control options.
+var _main_panel: PanelContainer
+var _controls_panel: PanelContainer
+var _bind_buttons: Dictionary = {}
+var _mash_hold_toggle: CheckButton
+var _controls_status: Label
+var _waiting_action: StringName = &""
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
 	_build_ui()
+	_build_controls_panel()
 	GameState.paused_changed.connect(_on_paused_changed)
 	GameState.setting_changed.connect(_on_setting_changed)
 	_on_paused_changed(GameState.is_paused)
@@ -52,6 +60,7 @@ func _build_ui() -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(420.0, 0.0)
 	_center.add_child(panel)
+	_main_panel = panel
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 28)
@@ -95,6 +104,11 @@ func _build_ui() -> void:
 	buttons.add_theme_constant_override("separation", 12)
 	layout.add_child(buttons)
 
+	var controls_button := Button.new()
+	controls_button.text = "Controls…"
+	controls_button.pressed.connect(_show_controls.bind(true))
+	buttons.add_child(controls_button)
+
 	var reset_button := Button.new()
 	reset_button.text = "Reset defaults"
 	reset_button.pressed.connect(_on_reset_pressed)
@@ -109,6 +123,7 @@ func _build_ui() -> void:
 func _on_paused_changed(paused: bool) -> void:
 	_backdrop.visible = paused
 	_center.visible = paused
+	_show_controls(false)
 	if paused:
 		_refresh_settings()
 	else:
@@ -126,6 +141,7 @@ func _refresh_settings() -> void:
 	_sfx_toggle.button_pressed = GameState.get_setting(&"sfx_enabled", true)
 	_timer_assist_option.select(maxi(Accessibility.TIMER_ASSIST_LEVELS.find(Accessibility.timer_assist()), 0))
 	_result_cues_toggle.button_pressed = Accessibility.result_cues_enabled()
+	_mash_hold_toggle.button_pressed = GameState.get_setting(&"mash_hold", false)
 
 
 func _on_music_toggled(enabled: bool) -> void:
@@ -141,6 +157,7 @@ func _on_reset_pressed() -> void:
 	GameState.set_setting(&"sfx_enabled", true)
 	GameState.set_setting(&"timer_assist", 1.0)
 	GameState.set_setting(&"result_cues", true)
+	GameState.set_setting(&"mash_hold", false)
 
 
 ## SCRUM-41: accessibility options (timer assist, shape + word result cues).
@@ -175,3 +192,117 @@ func _on_timer_assist_selected(index: int) -> void:
 
 func _on_result_cues_toggled(enabled: bool) -> void:
 	GameState.set_setting(&"result_cues", enabled)
+
+
+## SCRUM-57: key rebinding and alternative input options.
+func _build_controls_panel() -> void:
+	_controls_panel = PanelContainer.new()
+	_controls_panel.custom_minimum_size = Vector2(460.0, 0.0)
+	_controls_panel.visible = false
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#141a2b")
+	style.border_color = Color("#73b7ff")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	_controls_panel.add_theme_stylebox_override("panel", style)
+	_center.add_child(_controls_panel)
+
+	var margin := MarginContainer.new()
+	for side: String in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 24)
+	_controls_panel.add_child(margin)
+	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 8)
+	margin.add_child(layout)
+
+	var title := Label.new()
+	title.text = "Controls"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layout.add_child(title)
+	var hint := Label.new()
+	hint.text = "Click a key, then press the new key. Escape cancels."
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layout.add_child(hint)
+	layout.add_child(HSeparator.new())
+
+	for action: StringName in SettingsStore.REBINDABLE:
+		var row := HBoxContainer.new()
+		layout.add_child(row)
+		var label := Label.new()
+		label.text = SettingsStore.ACTION_LABELS[action]
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var bind_button := Button.new()
+		bind_button.custom_minimum_size = Vector2(170.0, 0.0)
+		bind_button.pressed.connect(_start_rebind.bind(action))
+		row.add_child(bind_button)
+		_bind_buttons[action] = bind_button
+
+	_mash_hold_toggle = CheckButton.new()
+	_mash_hold_toggle.text = "Hold instead of mash"
+	_mash_hold_toggle.tooltip_text = "Holding the mash key counts as repeated presses."
+	_mash_hold_toggle.toggled.connect(func(on: bool) -> void: GameState.set_setting(&"mash_hold", on))
+	layout.add_child(_mash_hold_toggle)
+
+	_controls_status = Label.new()
+	_controls_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_controls_status.custom_minimum_size = Vector2(400.0, 0.0)
+	layout.add_child(_controls_status)
+
+	layout.add_child(HSeparator.new())
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 12)
+	layout.add_child(buttons)
+	var reset_keys := Button.new()
+	reset_keys.text = "Reset keys"
+	reset_keys.pressed.connect(func() -> void:
+		SettingsStore.reset_bindings()
+		_controls_status.text = "Keys reset to defaults."
+		_refresh_bindings()
+	)
+	buttons.add_child(reset_keys)
+	var back := Button.new()
+	back.text = "Back"
+	back.pressed.connect(_show_controls.bind(false))
+	buttons.add_child(back)
+	_refresh_bindings()
+
+
+func _show_controls(open: bool) -> void:
+	if _controls_panel == null:
+		return
+	_waiting_action = &""
+	_main_panel.visible = not open
+	_controls_panel.visible = open
+	if open:
+		_controls_status.text = ""
+		_refresh_bindings()
+
+
+func _refresh_bindings() -> void:
+	for action: StringName in _bind_buttons:
+		var button: Button = _bind_buttons[action]
+		button.text = "Press a key…" if action == _waiting_action else SettingsStore.describe(action)
+
+
+func _start_rebind(action: StringName) -> void:
+	_waiting_action = action
+	_controls_status.text = "Press the new key for %s." % SettingsStore.ACTION_LABELS[action]
+	_refresh_bindings()
+
+
+func _input(event: InputEvent) -> void:
+	if _waiting_action == &"" or not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	get_viewport().set_input_as_handled()
+	if event.physical_keycode == KEY_ESCAPE or event.keycode == KEY_ESCAPE:
+		_controls_status.text = "Cancelled."
+	else:
+		var clash := SettingsStore.conflicts(_waiting_action, event)
+		SettingsStore.rebind(_waiting_action, event)
+		_controls_status.text = "%s → %s" % [SettingsStore.ACTION_LABELS[_waiting_action], SettingsStore.describe(_waiting_action)]
+		if not clash.is_empty():
+			_controls_status.text += "  (also used by %s)" % ", ".join(clash)
+	_waiting_action = &""
+	_refresh_bindings()

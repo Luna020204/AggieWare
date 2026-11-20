@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 InputActions="*res://scripts/core/input_actions.gd"
 GameState="*res://scripts/core/game_state.gd"
+SettingsStore="*res://scripts/core/settings_store.gd"
 
 [display]
 
