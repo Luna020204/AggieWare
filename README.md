@@ -87,6 +87,22 @@ returns to the menu. It prints `MICROGAME_CHECK_OK` on success. The forced
 win/fail column checks the signal wiring only. `tools/smoke_flow.gd` is what
 plays the real interactions.
 
+### Accessibility options (SCRUM-41)
+
+Open them with **Escape** (pause/settings menu) → **Accessibility**:
+
+- **Timer assist** (Off / +25% time / +50% time) slows game time while a
+  microgame runs, so every round lasts longer. It works for every microgame
+  without changing the microgame's code. Prompts, menus and the bike ride keep
+  normal speed. The test launcher's speed setting stacks with it.
+- **Shape + word result cues** (on by default) show a large ✔ CLEAR (filled
+  circle) or ✖ MISS (hollow square) banner after each round, and add a ⚠ to the
+  HUD timer in the last 3 seconds, so results don't rely on red/green alone.
+
+Code: `scripts/core/accessibility.gd` (values live in `GameState.settings`),
+`scripts/ui/result_cue.gd`. Test:
+`godot --headless --path . --script res://tools/smoke_accessibility.gd`.
+
 ### Building and releasing (SCRUM-59)
 
 All playtest builds and the final build come from one pipeline:
