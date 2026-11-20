@@ -18,6 +18,7 @@ const ENTRIES: Array[Dictionary] = [
 	{"id": "gates", "title": "Logic Gates", "day": "Thu", "scene": "res://scenes/microgames/gates.tscn"},
 	{"id": "scope", "title": "Variable Not in Scope", "day": "Lecture Hall", "scene": "res://scenes/microgames/variable_scope.tscn"},
 	{"id": "swipe", "title": "Swipe Card", "day": "Rush Hour", "scene": "res://scenes/microgames/swipe_card.tscn"},
+	{"id": "awake", "title": "Stay Awake", "day": "Lecture Hall", "scene": "res://scenes/microgames/stay_awake.tscn"},
 ]
 
 const DIFFICULTY_NAMES: Array[String] = ["EASY", "NORMAL", "HARD"]

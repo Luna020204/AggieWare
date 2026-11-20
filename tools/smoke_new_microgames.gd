@@ -13,6 +13,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	await _swipe_card()
+	await _stay_awake()
 	if not _failed:
 		print("NEW_MICROGAMES_SMOKE_OK")
 	quit(1 if _failed else 0)
@@ -94,6 +95,63 @@ func _swipe(game: Control, speed: float, y_offset: float) -> void:
 		if x >= left:
 			usec += int(step / speed * 1_000_000.0)
 	game.release()
+
+
+# --- SCRUM-76 Stay Awake -------------------------------------------------------
+
+func _stay_awake() -> void:
+	var scene := "res://scenes/microgames/stay_awake.tscn"
+	var intervals: Array[float] = []
+	var speeds: Array[float] = []
+	var sizes: Array[float] = []
+	for difficulty: int in 3:
+		var game := await _spawn(scene, difficulty)
+		intervals.append(game.SPAWN_INTERVALS[difficulty])
+		speeds.append(game.SPEEDS[difficulty])
+		var z: Button = game.spawn_z(Vector2(100.0, 200.0))
+		sizes.append(z.size.x)
+		_assert(z.focus_mode == Control.FOCUS_NONE, "awake: Z can take keyboard focus")
+		game.queue_free()
+	_assert(intervals[0] > intervals[1] and intervals[1] > intervals[2], "awake: Z's do not get more frequent")
+	_assert(speeds[0] < speeds[1] and speeds[1] < speeds[2], "awake: Z's do not get faster")
+	_assert(sizes[0] > sizes[1] and sizes[1] > sizes[2], "awake: Z's do not get smaller %s" % [sizes])
+
+	# Real clicks pop Z's; surviving to the bell wins once.
+	var game := await _spawn(scene, 1)
+	var results := _watch(game)
+	game._spawn_clock = -100.0  # no random spawns during this check
+	var z1: Button = game.spawn_z(Vector2(200.0, 250.0))
+	var z2: Button = game.spawn_z(Vector2(1000.0, 250.0))
+	await _click(z1.get_global_rect().get_center())
+	await _click(z2.get_global_rect().get_center())
+	_assert(game._popped == 2 and game._zs.is_empty(), "awake: real clicks did not pop both Z's (%d)" % game._popped)
+	game._seconds_left = 0.01
+	for i: int in 5:
+		await process_frame
+	_assert(results == [true], "awake: surviving did not win: %s" % [results])
+	game.queue_free()
+
+	# A Z that reaches the student fails the round exactly once.
+	game = await _spawn(scene, 0)
+	results = _watch(game)
+	game._spawn_clock = -100.0
+	var near: Button = game.spawn_z(game.STUDENT_CENTER - Vector2(30.0, 30.0))
+	for i: int in 5:
+		await process_frame
+	_assert(results == [false], "awake: Z reaching the student did not fail: %s" % [results])
+	game.pop_z(near)
+	_assert(game._popped == 0, "awake: popped a Z after the round ended")
+	game.queue_free()
+
+	# Untouched, Z's spawn by themselves and the round fails before the bell.
+	game = await _spawn(scene, 2)
+	results = _watch(game)
+	var frames := 0
+	while results.is_empty() and frames < 2000:
+		await process_frame
+		frames += 1
+	_assert(results == [false], "awake: idle round did not end in a fail: %s" % [results])
+	game.queue_free()
 
 
 # --- helpers -------------------------------------------------------------------

@@ -31,6 +31,7 @@ pressing **F6**:
   It isn't in the week flow yet. Play it from the test launcher (`--microgame=scope`).
   Smoke test: `godot --headless --path . --script res://tools/smoke_variable_scope.gd`
 - Swipe Card (SCRUM-72, Rush Hour, mouse only): `scenes/microgames/swipe_card.tscn` (launcher id `swipe`).
+- Stay Awake (SCRUM-76, Lecture Hall, mouse only): `scenes/microgames/stay_awake.tscn` (launcher id `awake`).
   Smoke test for Luna's later microgames: `godot --headless --path . --script res://tools/smoke_new_microgames.gd`
 - Bike transition: `scenes/core/bike_transition.tscn`
 - Title and stage flow: `scenes/core/game_flow.tscn`
@@ -60,7 +61,7 @@ speed, skipping the title and stage flow.
   godot --path . res://scenes/debug/microgame_launcher.tscn -- --microgame=gates --difficulty=2 --speed=1.5
   ```
 
-  Ids: `canvas`, `schedule`, `focus`, `gates`, `scope`, `swipe`.
+  Ids: `canvas`, `schedule`, `focus`, `gates`, `scope`, `swipe`, `awake`.
 
 **Adding a microgame:** add one line to `ENTRIES` in
 `scripts/debug/microgame_catalog.gd`. The scene must follow the same contract
