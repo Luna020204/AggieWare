@@ -103,6 +103,22 @@ Code: `scripts/core/accessibility.gd` (values live in `GameState.settings`),
 `scripts/ui/result_cue.gd`. Test:
 `godot --headless --path . --script res://tools/smoke_accessibility.gd`.
 
+### Controls and key remapping (SCRUM-57)
+
+**Escape → Controls…** lists every rebindable action (Up, Down, Left, Right,
+Action/confirm, Type, Mash). Click one and press the new key; Escape cancels.
+A warning appears if the key is already used by another action. **Reset keys**
+restores the defaults. **Hold instead of mash** lets players hold the mash key
+instead of tapping it (it repeats every 0.12 s). It works through
+`InputActions.is_just_pressed(InputActions.ACTION_MASH)`, so new mash
+microgames should read input through that call.
+
+Keys and all settings (audio, accessibility, controls) are saved to
+`user://settings.cfg` by the `SettingsStore` autoload
+(`scripts/core/settings_store.gd`) and restored on the next launch. Headless
+tool runs never touch that file. Pause stays on Escape so it can't be lost.
+Tested by `tools/smoke_accessibility.gd`.
+
 ### Building and releasing (SCRUM-59)
 
 All playtest builds and the final build come from one pipeline:

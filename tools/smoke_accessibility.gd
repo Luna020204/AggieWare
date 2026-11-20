@@ -4,6 +4,8 @@ extends SceneTree
 ## Run with: godot --headless --path . --script res://tools/smoke_accessibility.gd
 ## Prints ACCESSIBILITY_SMOKE_OK when every check passes.
 
+const TEST_SETTINGS := "user://smoke_settings.cfg"
+
 var _failed := false
 
 
@@ -12,8 +14,12 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# Never touch the player's real settings file.
+	_store().path = TEST_SETTINGS
 	await _accessibility_options()
+	await _control_options()
 	_reset_settings()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SETTINGS))
 	if not _failed:
 		print("ACCESSIBILITY_SMOKE_OK")
 	quit(1 if _failed else 0)
@@ -102,9 +108,135 @@ func _accessibility_options() -> void:
 	Engine.time_scale = 1.0
 
 
+# --- SCRUM-57 ----------------------------------------------------------------
+
+func _control_options() -> void:
+	_reset_settings()
+	var store := _store()
+	store.reset_bindings()
+	var menu: Variant = load("res://scenes/ui/settings_pause_menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	_gs().pause_game()
+	await process_frame
+	menu._show_controls(true)
+	for i: int in 3:
+		await process_frame  # let the containers lay the panel out
+	_assert(menu._controls_panel.visible and not menu._main_panel.visible, "controls: panel did not open")
+	_assert(menu._bind_buttons[&"game_up"].text.contains("W"), "controls: Up does not show its default key (%s)" % menu._bind_buttons[&"game_up"].text)
+
+	# Rebind Up to I through the menu with a real key event.
+	await _click(menu._bind_buttons[&"game_up"].get_global_rect().get_center())
+	_assert(menu._waiting_action == &"game_up", "controls: clicking Up did not start rebinding")
+	await _key(KEY_I)
+	_assert(_bound(&"game_up", KEY_I) and not _bound(&"game_up", KEY_W), "controls: Up was not rebound to I")
+	_assert(menu._bind_buttons[&"game_up"].text == "I", "controls: button text not updated (%s)" % menu._bind_buttons[&"game_up"].text)
+	Input.action_release(&"game_up")
+	var press := InputEventKey.new()
+	press.physical_keycode = KEY_I
+	_assert(InputMap.event_is_action(press, &"game_up"), "controls: I does not trigger game_up")
+
+	# Escape cancels without unbinding or unpausing.
+	menu._start_rebind(&"game_down")
+	await _key(KEY_ESCAPE)
+	_assert(_bound(&"game_down", KEY_S) and menu._waiting_action == &"", "controls: Escape did not cancel rebinding")
+	_assert(_gs().is_paused, "controls: Escape during rebinding unpaused the game")
+
+	# Conflicts are reported.
+	menu._start_rebind(&"game_left")
+	await _key(KEY_D)
+	_assert(menu._controls_status.text.contains("also used by Right"), "controls: conflict not reported: %s" % menu._controls_status.text)
+
+	# Bindings and options persist across a reload.
+	_gs().set_setting(&"timer_assist", 1.5)
+	_gs().set_setting(&"mash_hold", true)
+	store.save_settings()
+	# Simulate a fresh session: wipe the in-memory state without auto-saving.
+	store._loading = true
+	InputActions_reset_all()
+	_gs().set_setting(&"timer_assist", 1.0)
+	_gs().set_setting(&"mash_hold", false)
+	store._loading = false
+	store.load_settings()
+	_assert(_bound(&"game_up", KEY_I), "controls: rebinding not restored from the settings file")
+	_assert(is_equal_approx(float(_gs().get_setting(&"timer_assist")), 1.5) and _gs().get_setting(&"mash_hold") == true, "controls: options not restored from the settings file")
+
+	# Reset keys restores defaults.
+	store.reset_bindings()
+	_assert(_bound(&"game_up", KEY_W) and _bound(&"game_up", KEY_UP) and not _bound(&"game_up", KEY_I), "controls: reset did not restore Up")
+	_gs().resume_game()
+	menu.queue_free()
+	await process_frame
+
+	# Hold instead of mash: holding the key keeps producing presses.
+	var inputs := root.get_node("InputActions")
+	_gs().set_setting(&"mash_hold", true)
+	Input.action_press(&"game_mash")
+	var ticks := 0
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 600:
+		await process_frame
+		if inputs.is_just_pressed(&"game_mash"):
+			ticks += 1
+	Input.action_release(&"game_mash")
+	_assert(ticks >= 3, "controls: holding mash gave only %d presses" % ticks)
+	_gs().set_setting(&"mash_hold", false)
+	Input.action_press(&"game_mash")
+	ticks = 0
+	start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 600:
+		await process_frame
+		if inputs.is_just_pressed(&"game_mash"):
+			ticks += 1
+	Input.action_release(&"game_mash")
+	_assert(ticks <= 1, "controls: mash repeats with hold off (%d)" % ticks)
+
+
+func InputActions_reset_all() -> void:
+	var inputs := root.get_node("InputActions")
+	for action: StringName in _store().REBINDABLE:
+		inputs.reset_action(action)
+
+
+func _bound(action: StringName, keycode: int) -> bool:
+	for event: InputEvent in InputMap.action_get_events(action):
+		if event is InputEventKey and event.physical_keycode == keycode:
+			return true
+	return false
+
+
+func _key(keycode: int) -> void:
+	var event := InputEventKey.new()
+	event.physical_keycode = keycode
+	event.keycode = keycode
+	event.pressed = true
+	root.push_input(event)
+	await process_frame
+	var up := event.duplicate()
+	up.pressed = false
+	root.push_input(up)
+	await process_frame
+
+
+func _click(at: Vector2) -> void:
+	for pressed: bool in [true, false]:
+		var event := InputEventMouseButton.new()
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.pressed = pressed
+		event.position = at
+		event.global_position = at
+		root.push_input(event, true)
+		await process_frame
+
+
+func _store() -> Node:
+	return root.get_node("SettingsStore")
+
+
 func _reset_settings() -> void:
 	_gs().set_setting(&"timer_assist", 1.0)
 	_gs().set_setting(&"result_cues", true)
+	_gs().set_setting(&"mash_hold", false)
 	Engine.time_scale = 1.0
 
 
