@@ -30,7 +30,7 @@ HUD, and the bike transition", one full day, usable as the fallback demo.
    week as a whole chains 4 microgames. If the fallback demo should be one day with several
    microgames back to back, the flow / manager owner (SCRUM-14) needs to add a per-day playlist.
 3. **No shared microgame base class or manager** (SCRUM-15 / SCRUM-14 are still "Idea").
-   Microgames follow an informal contract instead (documented in `scripts/debug/microgame_catalog.gd`).
+   Microgames follow an informal contract instead (documented in `scripts/core/microgame_catalog.gd`).
 4. SCRUM-23 is not placed on a day yet. Adding it to `game_flow.gd` is the flow owner's call.
 5. PR #2's animation controller is not used by the bike transition or the microgames yet.
 6. Not checked: web (HTML5) export, the itch.io build, or real human playtesting. Every run

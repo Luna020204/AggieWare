@@ -34,6 +34,9 @@ var _center: CenterContainer
 var _active_scene: Control
 var _hud: Control
 var _pending_stage := 0
+## SCRUM-39: one-verb instruction prompt shown before each microgame.
+const PROMPT_SECONDS := 1.0
+var _prompt: Control
 
 
 func _ready() -> void:
@@ -178,12 +181,28 @@ func _start_stage(stage_index: int) -> void:
 	add_child(microgame)
 	_hud = HUD_SCENE.instantiate() as Control
 	add_child(_hud)
+	_show_instruction_prompt(microgame)
 	current_prompt = _prompt_for_stage(current_stage)
 
 	stage_selected.emit(current_stage)
 	microgame_requested.emit(current_stage)
 	var round_seconds: float = microgame.call("get_round_seconds")
 	_hud.set_round_status(round_seconds, round_seconds, lives, score, current_stage, STAGES.size())
+
+
+## SCRUM-39: hold the microgame (no processing, no input) behind its
+## instruction prompt, then start it when the prompt finishes.
+func _show_instruction_prompt(microgame: Control) -> void:
+	var entry := MicrogameCatalog.find_by_scene(microgame.scene_file_path)
+	if entry.is_empty():
+		return
+	microgame.process_mode = Node.PROCESS_MODE_DISABLED
+	_prompt = InstructionPrompt.for_entry(entry, PROMPT_SECONDS)
+	_prompt.finished.connect(func() -> void:
+		if is_instance_valid(microgame):
+			microgame.process_mode = Node.PROCESS_MODE_INHERIT
+	)
+	add_child(_prompt)
 
 
 func _scene_for_stage(stage_index: int) -> PackedScene:
@@ -321,6 +340,9 @@ func _retry_stage() -> void:
 
 
 func _clear_active_scene() -> void:
+	if is_instance_valid(_prompt):
+		_prompt.queue_free()
+		_prompt = null
 	if is_instance_valid(_active_scene):
 		_active_scene.queue_free()
 		_active_scene = null

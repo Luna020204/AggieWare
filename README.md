@@ -63,8 +63,16 @@ speed, skipping the title and stage flow.
 
   Ids: `canvas`, `schedule`, `focus`, `gates`, `scope`, `swipe`, `awake`.
 
+**Instruction prompts (SCRUM-39):** before every microgame, both the week flow
+and the launcher show a one-verb prompt (e.g. `SWIPE!`) with a control icon
+(mouse click, mouse drag, left/right, or arrow keys) for 1 second. The
+microgame is frozen (no timer, no input) until the prompt ends. Each catalog
+entry sets its `"verb"` and `"icon"`. The prompt is
+`scripts/ui/instruction_prompt.gd`, and the launcher's **Prompt** checkbox turns
+it off for quick testing.
+
 **Adding a microgame:** add one line to `ENTRIES` in
-`scripts/debug/microgame_catalog.gd`. The scene must follow the same contract
+`scripts/core/microgame_catalog.gd`. The scene must follow the same contract
 `game_flow.gd` uses: a `Control` root, `round_completed(success: bool)` and
 `time_changed(seconds_left, round_seconds)` signals, a `difficulty` property
 (0–2), and `get_round_seconds()`.

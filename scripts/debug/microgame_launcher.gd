@@ -33,6 +33,9 @@ var _hud: Control
 var _running := false
 var _elapsed := 0.0
 var _round_seconds := 0.0
+var _prompt: InstructionPrompt
+## SCRUM-39: show the one-verb instruction prompt before the microgame.
+var show_prompt := true
 
 
 func _ready() -> void:
@@ -48,7 +51,8 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	if _running:
-		_elapsed += delta
+		if not is_instance_valid(_prompt):
+			_elapsed += delta
 		return
 	if not _menu.visible:
 		return
@@ -93,6 +97,14 @@ func launch(index: int = selected_index, new_difficulty: int = difficulty, new_s
 	add_child(_hud)
 	_round_seconds = microgame.call("get_round_seconds")
 	_hud.set_round_status(_round_seconds, _round_seconds, 3, 0, 0, 1)
+	if show_prompt:
+		microgame.process_mode = Node.PROCESS_MODE_DISABLED
+		_prompt = InstructionPrompt.for_entry(entry)
+		_prompt.finished.connect(func() -> void:
+			if is_instance_valid(microgame):
+				microgame.process_mode = Node.PROCESS_MODE_INHERIT
+		)
+		add_child(_prompt)
 	move_child(_debug_bar, -1)
 
 	_elapsed = 0.0
@@ -113,6 +125,9 @@ func stop() -> void:
 	if is_instance_valid(_hud):
 		_hud.queue_free()
 	_hud = null
+	if is_instance_valid(_prompt):
+		_prompt.queue_free()
+	_prompt = null
 	_debug_bar.visible = false
 	_menu.visible = true
 	_result_label.text = last_result if last_result != "" else "Pick a microgame and press Launch."
@@ -270,6 +285,12 @@ func _build_menu() -> void:
 		_speed_option.add_item("%sx" % str(speed))
 	_speed_option.item_selected.connect(_set_speed)
 	options.add_child(_speed_option)
+	var prompt_toggle := CheckBox.new()
+	prompt_toggle.text = "Prompt"
+	prompt_toggle.button_pressed = show_prompt
+	prompt_toggle.focus_mode = Control.FOCUS_NONE
+	prompt_toggle.toggled.connect(func(on: bool) -> void: show_prompt = on)
+	options.add_child(prompt_toggle)
 
 	_launch_button = Button.new()
 	_launch_button.text = "LAUNCH"
