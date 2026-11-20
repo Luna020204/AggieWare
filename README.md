@@ -32,6 +32,7 @@ pressing **F6**:
   Smoke test: `godot --headless --path . --script res://tools/smoke_variable_scope.gd`
 - Swipe Card (SCRUM-72, Rush Hour, mouse only): `scenes/microgames/swipe_card.tscn` (launcher id `swipe`).
 - Stay Awake (SCRUM-76, Lecture Hall, mouse only): `scenes/microgames/stay_awake.tscn` (launcher id `awake`).
+- Microscope (SCRUM-84, Lecture Hall, arrow keys + optional ACTION): `scenes/microgames/microscope.tscn` (launcher id `microscope`).
   Smoke test for Luna's later microgames: `godot --headless --path . --script res://tools/smoke_new_microgames.gd`
 - Bike transition: `scenes/core/bike_transition.tscn`
 - Title and stage flow: `scenes/core/game_flow.tscn`
@@ -61,7 +62,7 @@ speed, skipping the title and stage flow.
   godot --path . res://scenes/debug/microgame_launcher.tscn -- --microgame=gates --difficulty=2 --speed=1.5
   ```
 
-  Ids: `canvas`, `schedule`, `focus`, `gates`, `scope`, `swipe`, `awake`.
+  Ids: `canvas`, `schedule`, `focus`, `gates`, `scope`, `swipe`, `awake`, `microscope`.
 
 **Instruction prompts (SCRUM-39):** before every microgame, both the week flow
 and the launcher show a one-verb prompt (e.g. `SWIPE!`) with a control icon
