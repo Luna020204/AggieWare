@@ -36,6 +36,7 @@ func _run() -> void:
 		for difficulty: int in 3:
 			await _check_one(entry, difficulty)
 	await _check_launcher()
+	await _check_flow_prompt()
 	Engine.time_scale = 1.0
 	if _failures == 0:
 		print("MICROGAME_CHECK_OK")
@@ -136,6 +137,18 @@ func _check_launcher() -> void:
 			problems.append("speed not applied (%.2f)" % Engine.time_scale)
 		if launcher._menu.visible:
 			problems.append("menu still visible while playing")
+		var entry: Dictionary = MicrogameCatalog.ENTRIES[index]
+		if not entry.has("verb") or not entry.has("icon"):
+			problems.append("%s has no instruction prompt (verb/icon)" % entry["id"])
+		elif not is_instance_valid(launcher._prompt) or launcher._prompt.verb != entry["verb"]:
+			problems.append("prompt not shown for %s" % entry["id"])
+		elif launcher._active.process_mode != Node.PROCESS_MODE_DISABLED:
+			problems.append("%s runs behind its prompt" % entry["id"])
+		else:
+			launcher._prompt.finish()
+			await process_frame
+			if launcher._active.process_mode == Node.PROCESS_MODE_DISABLED:
+				problems.append("%s did not start after its prompt" % entry["id"])
 		launcher._active.call("_finish_round", true, "check")
 		await create_timer(launcher.RESULT_DELAY + 0.3, true, false, true).timeout
 		if launcher._running or not launcher._menu.visible:
@@ -151,6 +164,37 @@ func _check_launcher() -> void:
 	else:
 		_failures += problems.size()
 		print("launcher: FAIL  " + "; ".join(problems))
+
+
+## SCRUM-39: the real week flow shows the prompt and holds the microgame.
+func _check_flow_prompt() -> void:
+	var flow: Variant = load("res://scenes/core/game_flow.tscn").instantiate()
+	root.add_child(flow)
+	await process_frame
+	var problems: Array[String] = []
+	for stage: int in 4:
+		flow._start_stage(stage)
+		await process_frame
+		var game: Control = flow._active_scene
+		var entry := MicrogameCatalog.find_by_scene(game.scene_file_path)
+		if not is_instance_valid(flow._prompt):
+			problems.append("day %d: no prompt" % (stage + 1))
+			continue
+		if flow._prompt.verb != entry.get("verb", ""):
+			problems.append("day %d: wrong verb %s" % [stage + 1, flow._prompt.verb])
+		if game.process_mode != Node.PROCESS_MODE_DISABLED:
+			problems.append("day %d: microgame runs behind the prompt" % (stage + 1))
+		flow._prompt.finish()
+		await process_frame
+		if game.process_mode == Node.PROCESS_MODE_DISABLED:
+			problems.append("day %d: microgame did not start after the prompt" % (stage + 1))
+	flow.queue_free()
+	await process_frame
+	if problems.is_empty():
+		print("flow prompts: ok (4 days show verb + icon, then start)")
+	else:
+		_failures += problems.size()
+		print("flow prompts: FAIL  " + "; ".join(problems))
 
 
 func _report(entry: Dictionary, difficulty: int, contract: String, tick: String, timeout: String, win: String, fail: String, notes: Array[String]) -> void:
