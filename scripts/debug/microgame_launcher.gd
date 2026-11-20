@@ -34,6 +34,7 @@ var _running := false
 var _elapsed := 0.0
 var _round_seconds := 0.0
 var _prompt: InstructionPrompt
+var _result_cue: ResultCue
 ## SCRUM-39: show the one-verb instruction prompt before the microgame.
 var show_prompt := true
 
@@ -112,7 +113,8 @@ func launch(index: int = selected_index, new_difficulty: int = difficulty, new_s
 	_menu.visible = false
 	_debug_bar.visible = true
 	_debug_label.text = "TEST  %s · %s · %sx" % [entry["title"], MicrogameCatalog.DIFFICULTY_NAMES[difficulty], _speed_text()]
-	Engine.time_scale = SPEEDS[speed_index]
+	# SCRUM-41: the timer-assist setting stacks on top of the test speed.
+	Accessibility.begin_microgame(SPEEDS[speed_index])
 
 
 ## Leaves the running microgame (if any) and shows the launcher menu.
@@ -128,6 +130,9 @@ func stop() -> void:
 	if is_instance_valid(_prompt):
 		_prompt.queue_free()
 	_prompt = null
+	if is_instance_valid(_result_cue):
+		_result_cue.queue_free()
+	_result_cue = null
 	_debug_bar.visible = false
 	_menu.visible = true
 	_result_label.text = last_result if last_result != "" else "Pick a microgame and press Launch."
@@ -142,6 +147,10 @@ func _on_round_completed(success: bool) -> void:
 	if not _running:
 		return
 	_running = false
+	Accessibility.end_microgame()
+	if Accessibility.result_cues_enabled():
+		_result_cue = ResultCue.create(success)
+		add_child(_result_cue)
 	var entry: Dictionary = MicrogameCatalog.ENTRIES[selected_index]
 	last_result = "Last run: %s · %s · %sx  →  %s after %.1f s (round is %.1f s)" % [
 		entry["title"], MicrogameCatalog.DIFFICULTY_NAMES[difficulty], _speed_text(),

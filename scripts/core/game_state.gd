@@ -9,6 +9,9 @@ var is_paused: bool = false
 var settings: Dictionary = {
 	&"music_enabled": true,
 	&"sfx_enabled": true,
+	# SCRUM-41 accessibility (see scripts/core/accessibility.gd).
+	&"timer_assist": 1.0,
+	&"result_cues": true,
 }
 
 

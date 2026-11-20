@@ -25,11 +25,16 @@ step "Import project"
 "$GODOT" --headless --path . --import >/dev/null 2>&1 || true
 
 if [[ "${SKIP_TESTS:-0}" != "1" ]]; then
-  for test in smoke_flow check_microgames smoke_variable_scope smoke_new_microgames; do
+  for test in smoke_flow check_microgames smoke_variable_scope smoke_new_microgames smoke_accessibility; do
     step "Smoke test: $test"
     if ! out="$("$GODOT" --headless --path . --script "res://tools/$test.gd" 2>&1)"; then
       echo "$out" | tail -30
       echo "FAILED: $test"
+      exit 1
+    fi
+    if echo "$out" | grep -q "SCRIPT ERROR"; then
+      echo "$out" | grep -A3 "SCRIPT ERROR" | head -30
+      echo "FAILED: $test hit a script error"
       exit 1
     fi
     if ! echo "$out" | grep -E "_OK$"; then

@@ -12,6 +12,9 @@ var _backdrop: ColorRect
 var _center: CenterContainer
 var _music_toggle: CheckButton
 var _sfx_toggle: CheckButton
+# SCRUM-41 accessibility controls.
+var _timer_assist_option: OptionButton
+var _result_cues_toggle: CheckButton
 
 
 func _ready() -> void:
@@ -83,6 +86,8 @@ func _build_ui() -> void:
 	_sfx_toggle.toggled.connect(_on_sfx_toggled)
 	layout.add_child(_sfx_toggle)
 
+	_build_accessibility_section(layout)
+
 	layout.add_child(HSeparator.new())
 
 	var buttons := HBoxContainer.new()
@@ -119,6 +124,8 @@ func _refresh_settings() -> void:
 		return
 	_music_toggle.button_pressed = GameState.get_setting(&"music_enabled", true)
 	_sfx_toggle.button_pressed = GameState.get_setting(&"sfx_enabled", true)
+	_timer_assist_option.select(maxi(Accessibility.TIMER_ASSIST_LEVELS.find(Accessibility.timer_assist()), 0))
+	_result_cues_toggle.button_pressed = Accessibility.result_cues_enabled()
 
 
 func _on_music_toggled(enabled: bool) -> void:
@@ -132,3 +139,39 @@ func _on_sfx_toggled(enabled: bool) -> void:
 func _on_reset_pressed() -> void:
 	GameState.set_setting(&"music_enabled", true)
 	GameState.set_setting(&"sfx_enabled", true)
+	GameState.set_setting(&"timer_assist", 1.0)
+	GameState.set_setting(&"result_cues", true)
+
+
+## SCRUM-41: accessibility options (timer assist, shape + word result cues).
+func _build_accessibility_section(layout: VBoxContainer) -> void:
+	layout.add_child(HSeparator.new())
+	var heading := Label.new()
+	heading.text = "Accessibility"
+	layout.add_child(heading)
+
+	var assist_row := HBoxContainer.new()
+	layout.add_child(assist_row)
+	var assist_label := Label.new()
+	assist_label.text = "Timer assist"
+	assist_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	assist_row.add_child(assist_label)
+	_timer_assist_option = OptionButton.new()
+	for level_name: String in Accessibility.TIMER_ASSIST_NAMES:
+		_timer_assist_option.add_item(level_name)
+	_timer_assist_option.tooltip_text = "Slows every microgame down so each round lasts longer."
+	_timer_assist_option.item_selected.connect(_on_timer_assist_selected)
+	assist_row.add_child(_timer_assist_option)
+
+	_result_cues_toggle = CheckButton.new()
+	_result_cues_toggle.text = "Shape + word result cues (not colour only)"
+	_result_cues_toggle.toggled.connect(_on_result_cues_toggled)
+	layout.add_child(_result_cues_toggle)
+
+
+func _on_timer_assist_selected(index: int) -> void:
+	GameState.set_setting(&"timer_assist", Accessibility.TIMER_ASSIST_LEVELS[index])
+
+
+func _on_result_cues_toggled(enabled: bool) -> void:
+	GameState.set_setting(&"result_cues", enabled)

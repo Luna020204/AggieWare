@@ -17,6 +17,9 @@ func _ready() -> void:
 
 func set_round_status(seconds_left: float, round_seconds: float, lives: int, score: int, stage_index: int, stage_count: int) -> void:
 	_timer_label.text = "TIME  %.1f" % maxf(seconds_left, 0.0)
+	# SCRUM-41: low-time warning that does not rely on the red colour alone.
+	if seconds_left <= 3.0 and Accessibility.result_cues_enabled():
+		_timer_label.text = "⚠ " + _timer_label.text
 	_lives_label.text = "LIVES  %d" % maxi(lives, 0)
 	_score_label.text = "SCORE  %d" % score
 	_progress_label.text = "DAY  %d / %d" % [stage_index + 1, stage_count]

@@ -37,6 +37,8 @@ var _pending_stage := 0
 ## SCRUM-39: one-verb instruction prompt shown before each microgame.
 const PROMPT_SECONDS := 1.0
 var _prompt: Control
+## SCRUM-41: shape + word result banner.
+var _result_cue: Control
 
 
 func _ready() -> void:
@@ -195,12 +197,14 @@ func _start_stage(stage_index: int) -> void:
 func _show_instruction_prompt(microgame: Control) -> void:
 	var entry := MicrogameCatalog.find_by_scene(microgame.scene_file_path)
 	if entry.is_empty():
+		Accessibility.begin_microgame()
 		return
 	microgame.process_mode = Node.PROCESS_MODE_DISABLED
 	_prompt = InstructionPrompt.for_entry(entry, PROMPT_SECONDS)
 	_prompt.finished.connect(func() -> void:
 		if is_instance_valid(microgame):
 			microgame.process_mode = Node.PROCESS_MODE_INHERIT
+			Accessibility.begin_microgame()
 	)
 	add_child(_prompt)
 
@@ -237,6 +241,10 @@ func _on_round_time_changed(seconds_left: float, round_seconds: float) -> void:
 func _on_round_completed(success: bool) -> void:
 	if state != FlowState.PLAYING:
 		return
+	Accessibility.end_microgame()
+	if Accessibility.result_cues_enabled():
+		_result_cue = ResultCue.create(success)
+		add_child(_result_cue)
 	if success:
 		score += 100
 	else:
@@ -340,6 +348,10 @@ func _retry_stage() -> void:
 
 
 func _clear_active_scene() -> void:
+	Accessibility.end_microgame()
+	if is_instance_valid(_result_cue):
+		_result_cue.queue_free()
+		_result_cue = null
 	if is_instance_valid(_prompt):
 		_prompt.queue_free()
 		_prompt = null

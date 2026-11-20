@@ -20,13 +20,13 @@ Write-Step "Import project"
 & $Godot --headless --path . --import *> $null
 
 if (-not $SkipTests) {
-    foreach ($test in @("smoke_flow", "check_microgames", "smoke_variable_scope", "smoke_new_microgames")) {
+    foreach ($test in @("smoke_flow", "check_microgames", "smoke_variable_scope", "smoke_new_microgames", "smoke_accessibility")) {
         Write-Step "Smoke test: $test"
         $ErrorActionPreference = "Continue"
         $out = & $Godot --headless --path . --script "res://tools/$test.gd" 2>&1 | Out-String
         $code = $LASTEXITCODE
         $ErrorActionPreference = "Stop"
-        if ($code -ne 0 -or $out -notmatch "_OK") {
+        if ($code -ne 0 -or $out -notmatch "_OK" -or $out -match "SCRIPT ERROR") {
             Write-Host (($out -split "`n" | Select-Object -Last 30) -join "`n")
             throw "FAILED: $test"
         }
