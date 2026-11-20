@@ -86,6 +86,31 @@ returns to the menu. It prints `MICROGAME_CHECK_OK` on success. The forced
 win/fail column checks the signal wiring only. `tools/smoke_flow.gd` is what
 plays the real interactions.
 
+### Building and releasing (SCRUM-59)
+
+All playtest builds and the final build come from one pipeline:
+
+1. `export_presets.cfg` has a **Web** preset (no threads, so it runs on itch.io
+   without special headers) that exports to `build/web/index.html`. `build/`
+   is git-ignored.
+2. `tools/build_web.sh` (macOS/Linux/CI) or `tools/build_web.ps1` (Windows)
+   runs every smoke test, stops if one fails, exports the Web preset, and
+   writes `build/aggieware-web.zip` together with `BUILD_COMMIT.txt`:
+
+   ```
+   powershell -ExecutionPolicy Bypass -File tools/build_web.ps1 -Godot "C:\path\to\Godot_v4.7.2-stable_win64_console.exe"
+   GODOT=/path/to/godot tools/build_web.sh
+   ```
+
+   This needs the Godot 4.7.2 export templates (**Editor → Manage Export
+   Templates → Download**).
+3. `.github/workflows/web-build.yml` does the same on GitHub for every push to
+   `main` and every pull request, and uploads `build/web` as an artifact.
+   A manual run with **publish** ticked, or a `v*` tag, also pushes the build
+   to itch.io with butler. Publishing needs a `BUTLER_API_KEY` repository
+   secret and an `ITCH_TARGET` repository variable (e.g. `user/aggieware:html5`).
+   Never commit the key.
+
 Playable build: _TBD (itch.io link)_
 
 ## Controls
