@@ -1,23 +1,17 @@
-extends Control
+extends "res://scripts/core/microgame_base.gd"
 
-## SCRUM-77: move a blue shield to intercept distracting thoughts.
-
-signal round_completed(success: bool)
-signal time_changed(seconds_left: float, round_seconds: float)
-
-@export_range(0, 2, 1) var difficulty: int = 0
-
+## Move a blue shield to intercept distracting thoughts until the exam ends.
+const UI := preload("res://scripts/ui/microgame_ui.gd")
 const DURATIONS: Array[float] = [8.0, 7.0, 6.0]
 const SPAWN_INTERVALS: Array[float] = [1.3, 0.95, 0.7]
 const SPEEDS: Array[float] = [210.0, 275.0, 335.0]
 const MISS_LIMITS: Array[int] = [4, 3, 2]
 const THOUGHTS: Array[String] = ["PHONE", "SNACK", "SOCIAL MEDIA", "NAP", "TEXTS"]
+const MAX_STEP := 1.0 / 120.0
 
-var _seconds_left := 0.0
 var _spawn_clock := 0.0
 var _blocked := 0
 var _missed := 0
-var _ended := false
 var _shield: PanelContainer
 var _status_label: Label
 var _timer_label: Label
@@ -29,115 +23,68 @@ func get_round_seconds() -> float:
 	return DURATIONS[clampi(difficulty, 0, 2)]
 
 
-func _ready() -> void:
-	difficulty = clampi(difficulty, 0, 2)
-	_rng.randomize()
-	_build_ui()
-	_start_round()
-
-
 func _input(event: InputEvent) -> void:
-	if _ended:
-		return
-	if event is InputEventMouseMotion:
-		_shield.position.x = clampf(event.position.x - _shield.size.x * 0.5, 30.0, 1080.0)
+	if can_interact() and event is InputEventMouseMotion:
+		var local_mouse: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
+		_shield.position.x = clampf(local_mouse.x - _shield.size.x * 0.5, 30.0, 1080.0)
 
 
-func _process(delta: float) -> void:
-	if _ended:
-		return
-	var direction := InputActions.get_strength(InputActions.ACTION_RIGHT) - InputActions.get_strength(InputActions.ACTION_LEFT)
-	_shield.position.x = clampf(_shield.position.x + direction * 650.0 * delta, 30.0, 1080.0)
-	_seconds_left = maxf(0.0, _seconds_left - delta)
+func _update_game(delta: float) -> void:
 	_timer_label.text = "EXAM  %.1f s" % _seconds_left
-	time_changed.emit(_seconds_left, DURATIONS[difficulty])
-	_spawn_clock += delta
-	if _spawn_clock >= SPAWN_INTERVALS[difficulty]:
-		_spawn_clock = 0.0
-		_spawn_thought()
-	for thought: Control in _thoughts.duplicate():
-		var velocity: Vector2 = thought.get_meta("velocity")
-		thought.position += velocity * delta
-		if thought.get_global_rect().intersects(_shield.get_global_rect()):
-			_blocked += 1
-			_update_status()
-			_remove_thought(thought)
-		elif thought.position.y > 570.0:
-			_missed += 1
-			_remove_thought(thought)
-			_update_status()
-			if _missed >= MISS_LIMITS[difficulty]:
-				_finish_round(false, "Too many distractions — refocus and try again!")
-				return
-	if _seconds_left <= 0.0:
-		_finish_round(true, "Exam complete — you stayed focused!")
+	var direction := InputActions.get_strength(InputActions.ACTION_RIGHT) - InputActions.get_strength(InputActions.ACTION_LEFT)
+	var remaining := maxf(delta, 0.0)
+	# Small simulation steps prevent fast thoughts from tunneling through the
+	# shield on a slow frame. The base limits delta to the actual round time.
+	while remaining > 0.0 and not _ended:
+		var step := minf(remaining, MAX_STEP)
+		remaining -= step
+		_shield.position.x = clampf(_shield.position.x + direction * 650.0 * step, 30.0, 1080.0)
+		_spawn_clock += step
+		while _spawn_clock >= SPAWN_INTERVALS[difficulty]:
+			_spawn_clock -= SPAWN_INTERVALS[difficulty]
+			_spawn_thought()
+		for thought: Control in _thoughts.duplicate():
+			var velocity: Vector2 = thought.get_meta("velocity")
+			thought.position += velocity * step
+			if Rect2(thought.position, thought.size).intersects(Rect2(_shield.position, _shield.size)):
+				_blocked += 1
+				_update_status()
+				_remove_thought(thought)
+			elif thought.position.y > 570.0:
+				_missed += 1
+				_remove_thought(thought)
+				_update_status()
+				if _missed >= MISS_LIMITS[difficulty]:
+					_finish_round(false, "Too many distractions — refocus and try again!")
+					return
 
 
 func _build_ui() -> void:
-	var background := ColorRect.new()
-	background.color = Color("#101a2d")
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
-	var title := Label.new()
-	title.text = "STAY FOCUSED"
-	title.position = Vector2(48, 35)
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color("#f5f7ff"))
-	add_child(title)
-	var instruction := Label.new()
-	instruction.text = "Move the blue shield with the mouse or Left / Right to block distractions."
-	instruction.position = Vector2(48, 126)
-	instruction.add_theme_font_size_override("font_size", 19)
-	instruction.add_theme_color_override("font_color", Color("#b8c7e6"))
-	add_child(instruction)
-	_timer_label = Label.new()
-	_timer_label.position = Vector2(48, 185)
-	_timer_label.add_theme_font_size_override("font_size", 24)
-	_timer_label.add_theme_color_override("font_color", Color("#ffd166"))
-	add_child(_timer_label)
+	_rng.randomize()
+	var header := UI.build_header(self, "STAY FOCUSED", "Move the blue shield with the mouse or Left / Right to block distractions.", show_internal_timer)
+	_timer_label = header.timer
 	var floor := ColorRect.new()
 	floor.color = Color("#2d4b74")
 	floor.position = Vector2(40, 610)
 	floor.size = Vector2(1200, 4)
 	floor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(floor)
-	_shield = PanelContainer.new()
-	_shield.position = Vector2(555, 550)
-	_shield.size = Vector2(170, 50)
-	_shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var shield_style := StyleBoxFlat.new()
-	shield_style.bg_color = Color("#2776d0")
-	shield_style.border_color = Color("#a5d4ff")
-	shield_style.set_border_width_all(3)
-	shield_style.set_corner_radius_all(12)
-	_shield.add_theme_stylebox_override("panel", shield_style)
-	add_child(_shield)
-	var shield_label := Label.new()
-	shield_label.text = "FOCUS SHIELD"
+	_shield = UI.panel(self, Rect2(555, 550, 170, 50), Color("#2776d0"), Color("#a5d4ff"), 12)
+	var shield_label := UI.label(_shield, "FOCUS SHIELD", Vector2.ZERO, 16, UI.TEXT, Vector2.ZERO)
 	shield_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shield_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	shield_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_shield.add_child(shield_label)
-	_status_label = Label.new()
-	_status_label.position = Vector2(48, 640)
-	_status_label.add_theme_font_size_override("font_size", 20)
-	_status_label.add_theme_color_override("font_color", Color("#b8c7e6"))
-	add_child(_status_label)
+	_status_label = UI.label(self, "", Vector2(48, 640), 20, UI.MUTED)
 
 
-func _start_round() -> void:
-	_ended = false
+func _reset_game() -> void:
 	_blocked = 0
 	_missed = 0
-	_seconds_left = DURATIONS[difficulty]
 	_spawn_clock = 0.0
+	_shield.position = Vector2(555, 550)
+	UI.set_status(_status_label, "")
 	_update_status()
 	_timer_label.text = "EXAM  %.1f s" % _seconds_left
-	for thought: Control in _thoughts:
-		thought.queue_free()
-	_thoughts.clear()
-	time_changed.emit(_seconds_left, DURATIONS[difficulty])
+	UI.clear_nodes(_thoughts)
 
 
 func _update_status() -> void:
@@ -145,43 +92,33 @@ func _update_status() -> void:
 
 
 func _spawn_thought() -> void:
-	var thought := PanelContainer.new()
-	thought.position = Vector2(_rng.randf_range(50.0, 1070.0), 245.0)
+	var origin := Vector2(_rng.randf_range(50.0, 1070.0), 245.0)
 	var velocity := Vector2(0.0, SPEEDS[difficulty])
 	if difficulty >= 2:
 		match _rng.randi_range(0, 2):
 			1:
-				thought.position = Vector2(-130.0, 335.0)
+				origin = Vector2(-130.0, 335.0)
 				velocity = Vector2(SPEEDS[difficulty] * 0.8, SPEEDS[difficulty] * 0.7)
 			2:
-				thought.position = Vector2(1250.0, 335.0)
+				origin = Vector2(1250.0, 335.0)
 				velocity = Vector2(-SPEEDS[difficulty] * 0.8, SPEEDS[difficulty] * 0.7)
+	var thought := UI.panel(self, Rect2(origin, Vector2(160, 46)), Color("#a64359"), Color("#a64359"), 8)
 	thought.set_meta("velocity", velocity)
-	thought.size = Vector2(160.0, 46.0)
-	thought.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#a64359")
-	style.set_corner_radius_all(8)
-	thought.add_theme_stylebox_override("panel", style)
-	var label := Label.new()
-	label.text = THOUGHTS[_rng.randi_range(0, THOUGHTS.size() - 1)]
+	var label := UI.label(thought, THOUGHTS[_rng.randi_range(0, THOUGHTS.size() - 1)], Vector2.ZERO, 16, UI.TEXT, Vector2.ZERO)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	thought.add_child(label)
-	add_child(thought)
 	_thoughts.append(thought)
 
 
 func _remove_thought(thought: Control) -> void:
 	_thoughts.erase(thought)
+	remove_child(thought)
 	thought.queue_free()
 
 
-func _finish_round(success: bool, message: String) -> void:
-	if _ended:
-		return
-	_ended = true
-	_status_label.text = message
-	_status_label.add_theme_color_override("font_color", Color("#73e6a8") if success else Color("#ff9e9e"))
-	round_completed.emit(success)
+func _on_timeout() -> void:
+	_finish_round(true, "Exam complete — you stayed focused!")
+
+
+func _show_result(success: bool, message: String) -> void:
+	UI.set_status(_status_label, message, "success" if success else "error")

@@ -7,6 +7,7 @@ var _lives_label: Label
 var _score_label: Label
 var _progress_label: Label
 var _timer_bar: ProgressBar
+var _round_label: Label
 
 
 func _ready() -> void:
@@ -15,11 +16,12 @@ func _ready() -> void:
 	_build_ui()
 
 
-func set_round_status(seconds_left: float, round_seconds: float, lives: int, score: int, stage_index: int, stage_count: int) -> void:
+func set_round_status(seconds_left: float, round_seconds: float, lives: int, score: int, stage_index: int, stage_count: int, round_index: int = 0, round_count: int = 1, game_title: String = "") -> void:
 	_timer_label.text = "TIME  %.1f" % maxf(seconds_left, 0.0)
 	_lives_label.text = "LIVES  %d" % maxi(lives, 0)
 	_score_label.text = "SCORE  %d" % score
 	_progress_label.text = "DAY  %d / %d" % [stage_index + 1, stage_count]
+	_round_label.text = "%s   ·   ROUND %d / %d" % [game_title, round_index + 1, round_count]
 	_timer_bar.value = 100.0 * clampf(seconds_left / maxf(round_seconds, 0.01), 0.0, 1.0)
 	_timer_label.add_theme_color_override("font_color", Color("#ff9e9e") if seconds_left <= 3.0 else Color("#f5f7ff"))
 
@@ -48,6 +50,11 @@ func _build_ui() -> void:
 	var layout := VBoxContainer.new()
 	layout.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(layout)
+	_round_label = Label.new()
+	_round_label.add_theme_font_size_override("font_size", 14)
+	_round_label.add_theme_color_override("font_color", Color("#b8c7e6"))
+	_round_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layout.add_child(_round_label)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 18)

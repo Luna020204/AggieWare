@@ -14,6 +14,7 @@ const ACTION_LEFT: StringName = &"game_left"
 const ACTION_RIGHT: StringName = &"game_right"
 const ACTION_CONFIRM: StringName = &"game_confirm"
 const ACTION_PAUSE: StringName = &"game_pause"
+const ACTION_RETRY: StringName = &"game_retry"
 
 const ACTIONS: Array[StringName] = [
 	ACTION_TYPE,
@@ -24,6 +25,7 @@ const ACTIONS: Array[StringName] = [
 	ACTION_RIGHT,
 	ACTION_CONFIRM,
 	ACTION_PAUSE,
+	ACTION_RETRY,
 ]
 
 const DEFAULT_KEYS: Dictionary = {
@@ -35,6 +37,7 @@ const DEFAULT_KEYS: Dictionary = {
 	ACTION_RIGHT: [KEY_RIGHT, KEY_D],
 	ACTION_CONFIRM: [KEY_ENTER, KEY_SPACE],
 	ACTION_PAUSE: [KEY_ESCAPE],
+	ACTION_RETRY: [KEY_R],
 }
 
 
@@ -46,19 +49,14 @@ func _ensure_default_actions() -> void:
 	for action_name: StringName in ACTIONS:
 		if not InputMap.has_action(action_name):
 			InputMap.add_action(action_name)
-
+		# An existing binding belongs to the project or player. Do not silently
+		# re-add WASD/default keys after a teammate has customized the Input Map.
+		if not InputMap.action_get_events(action_name).is_empty():
+			continue
 		for keycode: int in DEFAULT_KEYS[action_name]:
-			if not _has_physical_key(action_name, keycode):
-				var event := InputEventKey.new()
-				event.physical_keycode = keycode
-				InputMap.action_add_event(action_name, event)
-
-
-func _has_physical_key(action_name: StringName, keycode: int) -> bool:
-	for event: InputEvent in InputMap.action_get_events(action_name):
-		if event is InputEventKey and event.physical_keycode == keycode:
-			return true
-	return false
+			var event := InputEventKey.new()
+			event.physical_keycode = keycode
+			InputMap.action_add_event(action_name, event)
 
 
 func is_pressed(action_name: StringName) -> bool:
@@ -73,10 +71,21 @@ func get_strength(action_name: StringName) -> float:
 	return Input.get_action_strength(action_name)
 
 
+func movement_vector() -> Vector2:
+	return Input.get_vector(ACTION_LEFT, ACTION_RIGHT, ACTION_UP, ACTION_DOWN)
+
+
 func get_action_events(action_name: StringName) -> Array[InputEvent]:
 	if not InputMap.has_action(action_name):
 		return []
 	return InputMap.action_get_events(action_name)
+
+
+func action_label(action_name: StringName) -> String:
+	var events := get_action_events(action_name)
+	if events.is_empty():
+		return String(action_name)
+	return events[0].as_text().replace(" (Physical)", "")
 
 
 ## Hook for SCRUM-57 key remapping. Replacing the events keeps remapping

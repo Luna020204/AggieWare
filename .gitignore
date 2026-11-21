@@ -1,20 +1,22 @@
-# Godot 4 generated files
+# Godot generated files and local integration artifacts
 .godot/
 /android/
+/artifacts/
+*.tmp
 
-# Exported builds (publish them to itch.io, not the repo)
+# Exported builds
 /build/
 *.exe
 *.pck
 *.zip
 
-# OS / editor clutter
+# OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Secrets: never commit these
+# Local credentials
 .env
 *.keystore
 export_credentials.cfg

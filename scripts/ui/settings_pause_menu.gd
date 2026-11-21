@@ -12,6 +12,9 @@ var _backdrop: ColorRect
 var _center: CenterContainer
 var _music_toggle: CheckButton
 var _sfx_toggle: CheckButton
+var _pause_hint: Label
+var _resume_button: Button
+var _previous_focus: WeakRef
 
 
 func _ready() -> void:
@@ -66,10 +69,10 @@ func _build_ui() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layout.add_child(title)
 
-	var hint := Label.new()
-	hint.text = "Press Escape to resume"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	layout.add_child(hint)
+	_pause_hint = Label.new()
+	_pause_hint.text = "Press %s to resume" % InputActions.action_label(InputActions.ACTION_PAUSE)
+	_pause_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layout.add_child(_pause_hint)
 
 	layout.add_child(HSeparator.new())
 
@@ -95,18 +98,27 @@ func _build_ui() -> void:
 	reset_button.pressed.connect(_on_reset_pressed)
 	buttons.add_child(reset_button)
 
-	var resume_button := Button.new()
-	resume_button.text = "Resume"
-	resume_button.pressed.connect(close_menu)
-	buttons.add_child(resume_button)
+	_resume_button = Button.new()
+	_resume_button.text = "Resume"
+	_resume_button.pressed.connect(close_menu)
+	buttons.add_child(_resume_button)
 
 
 func _on_paused_changed(paused: bool) -> void:
+	if paused:
+		var focus_owner := get_viewport().gui_get_focus_owner()
+		_previous_focus = weakref(focus_owner) if focus_owner != null else null
 	_backdrop.visible = paused
 	_center.visible = paused
 	if paused:
 		_refresh_settings()
+		_resume_button.grab_focus()
 	else:
+		if _previous_focus != null:
+			var focus_owner := _previous_focus.get_ref() as Control
+			if is_instance_valid(focus_owner) and focus_owner.is_visible_in_tree():
+				focus_owner.grab_focus()
+		_previous_focus = null
 		menu_closed.emit()
 
 
@@ -117,8 +129,9 @@ func _on_setting_changed(_setting_name: StringName, _value: Variant) -> void:
 func _refresh_settings() -> void:
 	if not is_instance_valid(_music_toggle):
 		return
-	_music_toggle.button_pressed = GameState.get_setting(&"music_enabled", true)
-	_sfx_toggle.button_pressed = GameState.get_setting(&"sfx_enabled", true)
+	_pause_hint.text = "Press %s to resume" % InputActions.action_label(InputActions.ACTION_PAUSE)
+	_music_toggle.set_pressed_no_signal(GameState.get_setting(&"music_enabled", true))
+	_sfx_toggle.set_pressed_no_signal(GameState.get_setting(&"sfx_enabled", true))
 
 
 func _on_music_toggled(enabled: bool) -> void:

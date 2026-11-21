@@ -14,6 +14,7 @@ signal transition_finished(next_scene_path: String)
 @export_file("*.tscn") var next_scene_path: String = ""
 @export_range(0, 9, 1) var lives: int = 3
 @export var score: int = 0
+@export var managed_by_flow := false
 
 var _elapsed := 0.0
 var _current_lane := 1
@@ -31,26 +32,36 @@ const LANE_Y := [245.0, 350.0, 455.0]
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_build_ui()
+	if not managed_by_flow:
+		var pause_scene: PackedScene = load("res://scenes/ui/settings_pause_menu.tscn")
+		add_child(pause_scene.instantiate())
 	_reset_transition()
 
 
 func _process(delta: float) -> void:
-	if _finished:
+	if _finished or not is_inside_tree() or get_tree().paused:
 		return
-
-	if InputActions.is_just_pressed(InputActions.ACTION_UP):
-		_set_lane(_current_lane - 1)
-	if InputActions.is_just_pressed(InputActions.ACTION_DOWN):
-		_set_lane(_current_lane + 1)
-	if InputActions.is_just_pressed(InputActions.ACTION_CONFIRM):
-		_finish_transition()
-
-	_elapsed += delta
-	var fraction := clampf(_elapsed / transition_duration, 0.0, 1.0)
+	_elapsed += maxf(delta, 0.0)
+	var fraction := clampf(_elapsed / maxf(transition_duration, 0.001), 0.0, 1.0)
 	_progress.value = fraction * 100.0
 	_bike.position.x = TRACK_RECT.position.x + 34.0 + fraction * (TRACK_RECT.size.x - 110.0)
 	if auto_advance and _elapsed >= transition_duration:
 		_finish_transition()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if _finished or get_tree().paused or (event is InputEventKey and event.echo):
+		return
+	var viewport := get_viewport()
+	if event.is_action_pressed(InputActions.ACTION_UP):
+		_set_lane(_current_lane - 1)
+	elif event.is_action_pressed(InputActions.ACTION_DOWN):
+		_set_lane(_current_lane + 1)
+	elif event.is_action_pressed(InputActions.ACTION_CONFIRM):
+		_finish_transition()
+	else:
+		return
+	viewport.set_input_as_handled()
 
 
 func _build_ui() -> void:
@@ -140,8 +151,8 @@ func _reset_transition() -> void:
 	_progress.value = 0.0
 	_lives_label.text = "Lives: %d" % lives
 	_score_label.text = "Score: %d" % score
-	_status_label.text = "Use Up / Down to choose your lane · Confirm to skip"
 	_set_lane(_current_lane)
+	_status_label.text = "Use Up / Down to choose your lane · Confirm to skip"
 
 
 func _set_lane(lane: int) -> void:
@@ -157,7 +168,7 @@ func _finish_transition() -> void:
 	_progress.value = 100.0
 	_status_label.text = "Arrived — loading %s" % next_prompt
 	transition_finished.emit(next_scene_path)
-	if next_scene_path != "" and ResourceLoader.exists(next_scene_path):
+	if not managed_by_flow and is_inside_tree() and next_scene_path != "" and ResourceLoader.exists(next_scene_path):
 		get_tree().change_scene_to_file.call_deferred(next_scene_path)
 
 

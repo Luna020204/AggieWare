@@ -26,19 +26,19 @@ func _input(event: InputEvent) -> void:
 
 
 func pause_game() -> void:
-	if is_paused:
-		return
+	var changed := not is_paused
 	is_paused = true
 	get_tree().paused = true
-	paused_changed.emit(true)
+	if changed:
+		paused_changed.emit(true)
 
 
 func resume_game() -> void:
-	if not is_paused:
-		return
+	var changed := is_paused
 	is_paused = false
 	get_tree().paused = false
-	paused_changed.emit(false)
+	if changed:
+		paused_changed.emit(false)
 
 
 func toggle_pause() -> void:
