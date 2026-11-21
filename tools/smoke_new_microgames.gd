@@ -34,18 +34,31 @@ func _swipe_card() -> void:
 		game.queue_free()
 	_assert(durations[0] > durations[1] and durations[1] > durations[2], "swipe: time does not shrink %s" % [durations])
 	_assert(widths[0] > widths[1] and widths[1] > widths[2], "swipe: speed window does not narrow %s" % [widths])
+	# The wallet holds 2 / 3 / 4 cards, always including exactly one Aggie Card.
+	for difficulty: int in 3:
+		var wallet := await _spawn(scene, difficulty)
+		var ids: Array = wallet._cards.map(func(c: TextureRect) -> String: return wallet.card_id(c))
+		_assert(ids.size() == difficulty + 2 and ids.count("aggie") == 1, "swipe: wallet cards wrong at %d: %s" % [difficulty, ids])
+		_assert(wallet.card_id(wallet._card) == "aggie", "swipe: _card is not the Aggie Card")
+		wallet.queue_free()
 
 	# Too slow, too fast and misaligned swipes are rejected; the round goes on.
 	var game := await _spawn(scene, 1)
+	game.skip_intro()
 	var results := _watch(game)
 	var window: Vector2 = game.get_speed_window()
 	_swipe(game, (window.x * 0.5), 0.0)
 	_assert(results.is_empty() and game._status_label.text.contains("slow"), "swipe: slow swipe not rejected: %s" % game._status_label.text)
-	_assert(game._card.position == game.CARD_HOME, "swipe: card not reset after a bad swipe")
+	_assert(game._card.position == game.card_home(game._card), "swipe: card not put back in the wallet after a bad swipe")
 	_swipe(game, window.y * 1.5, 0.0)
 	_assert(results.is_empty() and game._status_label.text.contains("fast"), "swipe: fast swipe not rejected")
 	_swipe(game, (window.x + window.y) * 0.5, 120.0)
 	_assert(results.is_empty() and game._status_label.text.contains("slot"), "swipe: misaligned swipe not rejected")
+	# A good swipe with the wrong card is declined, and that card goes back.
+	var decoy: TextureRect = game._cards.filter(func(c: TextureRect) -> bool: return c != game._card)[0]
+	_swipe(game, (window.x + window.y) * 0.5, 0.0, decoy)
+	_assert(results.is_empty() and game._status_label.text.contains("declined"), "swipe: wrong card not declined: %s" % game._status_label.text)
+	_assert(decoy.position == game.card_home(decoy) and decoy.z_index == 0, "swipe: wrong card not put back in the wallet")
 	# A swipe inside the window wins exactly once.
 	_swipe(game, (window.x + window.y) * 0.5, 0.0)
 	_assert(results == [true], "swipe: good swipe did not win: %s" % [results])
@@ -53,20 +66,37 @@ func _swipe_card() -> void:
 	_assert(results.size() == 1, "swipe: second result after the round ended")
 	game.queue_free()
 
-	# A real mouse press on the card starts a drag; releasing early resets it.
-	game = await _spawn(scene, 0)
-	var grab: Vector2 = game._card.get_global_rect().get_center()
+	# A real mouse press on the visible top of a card pulls it out; releasing
+	# early puts it back. The pocket hides the rest of the card and blocks clicks.
+	game = await _spawn(scene, 2)
+	# Cards cannot be pulled while the intro is on screen.
+	var intro_grab: Vector2 = game._card.get_global_rect().position + Vector2(game.CARD_SIZE.x * 0.5, 12.0)
+	await _mouse(intro_grab, true)
+	_assert(not game._dragging, "swipe: a card was pulled during the intro")
+	await _mouse(intro_grab, false)
+	game.skip_intro()
+	var home: Vector2 = game.card_home(game._card)
+	var grab: Vector2 = game._card.get_global_rect().position + Vector2(game.CARD_SIZE.x * 0.5, 12.0)
 	await _mouse(grab, true)
-	_assert(game._dragging, "swipe: real click on the card did not start a drag")
+	_assert(game._dragging and game._held == game._card, "swipe: real click on the card's top did not pull it out")
 	await _move(grab + Vector2(60.0, 0.0))
-	_assert(game._card.position.x > game.CARD_HOME.x, "swipe: card did not follow the mouse")
+	_assert(game._card.position.x > home.x and game._card.z_index > 0, "swipe: card did not follow the mouse above the wallet")
 	await _mouse(grab + Vector2(60.0, 0.0), false)
-	_assert(not game._dragging and game._card.position == game.CARD_HOME, "swipe: early release did not reset the card")
+	_assert(not game._dragging and game._card.position == home, "swipe: early release did not put the card back")
+	var pocket_point: Vector2 = game.WALLET_POS + Vector2(150.0, 120.0)
+	await _mouse(pocket_point, true)
+	_assert(not game._dragging, "swipe: a click on the wallet pocket pulled out a card")
+	await _mouse(pocket_point, false)
 	game.queue_free()
 
-	# HARD moves the scanner; timeout fails.
+	# The timer waits for the intro; HARD moves the scanner; timeout fails.
 	game = await _spawn(scene, 2)
 	results = _watch(game)
+	var full: float = game._seconds_left
+	for i: int in 5:
+		await process_frame
+	_assert(game._seconds_left == full and game._intro.visible, "swipe: timer ran during the intro")
+	game.skip_intro()
 	var start_y: float = game._scanner.position.y
 	for i: int in 20:
 		await process_frame
@@ -78,12 +108,15 @@ func _swipe_card() -> void:
 	game.queue_free()
 
 
-## Drags the card through the scanner at `speed` px/s, offset vertically by `y_offset`.
-func _swipe(game: Control, speed: float, y_offset: float) -> void:
+## Drags a card (the Aggie Card by default) through the scanner at `speed` px/s,
+## offset vertically by `y_offset`.
+func _swipe(game: Control, speed: float, y_offset: float, card: TextureRect = null) -> void:
+	if card == null:
+		card = game._card
 	var slot_y: float = game._scanner.position.y + game._scanner.size.y * 0.5
-	var start := Vector2(game.CARD_HOME.x + game.CARD_SIZE.x * 0.5, slot_y + y_offset)
-	game.begin_drag(game._card.position + game.CARD_SIZE * 0.5)
-	game._card.position = start - game.CARD_SIZE * 0.5
+	var start := Vector2(game.card_home(card).x + game.CARD_SIZE.x * 0.5, slot_y + y_offset)
+	game.begin_drag(card.position + game.CARD_SIZE * 0.5, card)
+	card.position = start - game.CARD_SIZE * 0.5
 	game._drag_offset = game.CARD_SIZE * 0.5
 	var left: float = game._scanner.position.x
 	var right: float = left + game._scanner.size.x

@@ -1,14 +1,25 @@
 extends Control
 
-## SCRUM-72: Swipe Card (outside / travel, Rush Hour).
+## SCRUM-72: Swipe Card (Rush Hour).
 ##
-## Drag the Aggie card through the scanner in one smooth left-to-right swipe.
-## Mouse and click only. A bad swipe resets the card so you can try again
-## until time runs out.
+## Pay with Aggie Cash at the Peet's Coffee counter on campus: pull your Aggie
+## Card out of a wallet full of cards and drag it through the card reader in
+## one smooth left-to-right swipe. Mouse and click only. Any card can be
+## pulled, but only the Aggie Card is accepted. A bad swipe or the wrong card
+## goes back into the wallet so you can try again until time runs out.
+##
+## The round opens with a big title and instruction that fade out; the timer
+## starts after that. Results pop up in the middle of the screen and fade.
+##
+## Art is pixel art drawn at 1/5 scale (tools/art/gen_swipe_card_art.py) and
+## shown at 5x with nearest filtering. Text uses the AggiePixel font
+## (tools/art/gen_pixel_font.py), which is 7 px tall, so font sizes are
+## multiples of 7.
 ##
 ## Difficulty (0..2):
-##   less time (8 / 7 / 6 s), a narrower "not too fast, not too slow" speed
-##   window, and on HARD the scanner slides up and down.
+##   less time (9 / 8 / 7 s), more cards in the wallet (2 / 3 / 4, with a
+##   look-alike license on HARD), a narrower "not too fast, not too slow"
+##   speed window, and on HARD the reader slides up and down.
 
 signal round_completed(success: bool)
 signal time_changed(seconds_left: float, round_seconds: float)
@@ -16,19 +27,47 @@ signal time_changed(seconds_left: float, round_seconds: float)
 @export_range(0, 2, 1) var difficulty: int = 0
 @export var show_internal_timer: bool = true
 
-const DURATIONS: Array[float] = [8.0, 7.0, 6.0]
+const DURATIONS: Array[float] = [9.0, 8.0, 7.0]
+const INTRO_SECONDS := 1.6
+const INTRO_FADE := 0.4
+const POP_SECONDS := 1.4
+const POP_FADE := 0.4
 ## Accepted swipe speed through the scanner, in pixels per real second.
 const SPEED_MIN: Array[float] = [200.0, 450.0, 550.0]
 const SPEED_MAX: Array[float] = [4000.0, 1800.0, 1400.0]
 const ALIGN_TOLERANCE: Array[float] = [70.0, 55.0, 45.0]
+## Cards in the wallet besides the Aggie Card, per difficulty.
+const DECOYS := [["credit"], ["credit", "rewards"], ["credit", "rewards", "license"]]
+const ART := "res://assets/art/microgames/swipe_card/"
+const BACKGROUND_TEXTURE := preload(ART + "coffee_counter_bg.png")
+const READER_TEXTURE := preload(ART + "card_reader.png")
+const WALLET_BACK_TEXTURE := preload(ART + "wallet_back.png")
+const WALLET_FRONT_TEXTURE := preload(ART + "wallet_front.png")
+const CARD_TEXTURES := {
+	"aggie": preload(ART + "aggie_card.png"),
+	"credit": preload(ART + "credit_card.png"),
+	"rewards": preload(ART + "rewards_card.png"),
+	"license": preload(ART + "license_card.png"),
+}
+const PIXEL_FONT := preload("res://assets/fonts/aggie_pixel.fnt")
+const SHADOW := Color("#14121a")
+const PX := 5.0
+## The reader art is 32x52 with its slot on rows 24-26.
 const SCANNER_RECT := Rect2(560.0, 250.0, 160.0, 260.0)
-const SLOT_HEIGHT := 18.0
-const CARD_SIZE := Vector2(190.0, 120.0)
-const CARD_HOME := Vector2(150.0, 320.0)
+const SLOT_TOP := 120.0
+const SLOT_HEIGHT := 15.0
+## The card art is 48x30.
+const CARD_SIZE := Vector2(240.0, 150.0)
+## The open wallet: a 60x40 back drawn behind the cards and a 60x30 pocket
+## drawn in front of them, 10 px below the back's top edge.
+const WALLET_POS := Vector2(40.0, 380.0)
+const WALLET_SLOTS := 4
 const SCANNER_TRAVEL := 120.0
 const METER_MAX_SPEED := 3000.0
 
 var _seconds_left := 0.0
+var _intro_left := 0.0
+var _pop_left := 0.0
 var _ended := false
 var _elapsed := 0.0
 var _dragging := false
@@ -38,11 +77,18 @@ var _entered := false
 var _aligned := true
 var _last_speed := -1.0
 
-var _card: Panel
-var _scanner: Panel
+## The Aggie Card, wherever it sits in the wallet this round.
+var _card: TextureRect
+var _cards: Array[TextureRect] = []
+var _held: TextureRect
+var _scanner: TextureRect
 var _slot: ColorRect
 var _light: Label
 var _timer_label: Label
+var _intro: Control
+## Darkens the scene behind the intro and result messages so they read clearly.
+var _dim: ColorRect
+## Result messages; they pop up in the middle of the screen and fade.
 var _status_label: Label
 var _meter: Control
 
@@ -51,8 +97,34 @@ func get_round_seconds() -> float:
 	return DURATIONS[clampi(difficulty, 0, 2)]
 
 
+## Time before the round timer starts, for tools that wait for a timeout.
+func get_intro_seconds() -> float:
+	return INTRO_SECONDS
+
+
 func get_speed_window() -> Vector2:
 	return Vector2(SPEED_MIN[difficulty], SPEED_MAX[difficulty])
+
+
+## Where a card rests in the wallet.
+func card_home(card: TextureRect) -> Vector2:
+	return card.get_meta("home")
+
+
+func card_id(card: TextureRect) -> String:
+	return card.get_meta("id")
+
+
+## Ends the intro at once. Public for tests.
+func skip_intro() -> void:
+	_intro_left = 0.0
+	_intro.visible = false
+	_update_dim()
+
+
+func _update_dim() -> void:
+	var intro_alpha := _intro.modulate.a if _intro.visible else 0.0
+	_dim.color.a = 0.55 * maxf(intro_alpha, _status_label.modulate.a)
 
 
 func _ready() -> void:
@@ -62,16 +134,25 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _pop_left > 0.0:
+		_pop_left = maxf(0.0, _pop_left - delta)
+		_status_label.modulate.a = clampf(_pop_left / POP_FADE, 0.0, 1.0)
+	_update_dim()
 	if _ended:
+		return
+	if _intro_left > 0.0:
+		_intro_left = maxf(0.0, _intro_left - delta)
+		_intro.modulate.a = clampf(_intro_left / INTRO_FADE, 0.0, 1.0)
+		_intro.visible = _intro_left > 0.0
 		return
 	_elapsed += delta
 	_seconds_left = maxf(0.0, _seconds_left - delta)
-	_timer_label.text = "TIME  %.1f s" % _seconds_left
+	_timer_label.text = "TIME %.1f" % _seconds_left
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
 	if difficulty >= 2:
 		_scanner.position.y = SCANNER_RECT.position.y + sin(_elapsed * 2.4) * SCANNER_TRAVEL
 	if _seconds_left <= 0.0:
-		_finish_round(false, "Time's up — the door stayed locked.")
+		_finish_round(false, "TIME'S UP!\nThe line moved on without you.")
 
 
 func _input(event: InputEvent) -> void:
@@ -85,20 +166,23 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _on_card_input(event: InputEvent) -> void:
-	if _ended:
+func _on_card_input(event: InputEvent, card: TextureRect) -> void:
+	if _ended or _dragging or _intro_left > 0.0:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		begin_drag(_card.position + event.position)
+		begin_drag(card.position + event.position, card)
 		accept_event()
 
 
-## Public so tests can drive a swipe with exact timestamps.
-func begin_drag(at: Vector2) -> void:
+## Public so tests can drive a swipe with exact timestamps. Defaults to the
+## Aggie Card.
+func begin_drag(at: Vector2, card: TextureRect = null) -> void:
 	if _ended:
 		return
+	_held = card if card != null else _card
+	_held.z_index = 2
 	_dragging = true
-	_drag_offset = at - _card.position
+	_drag_offset = at - _held.position
 	_entered = false
 	_entered_usec = -1
 	_aligned = true
@@ -107,8 +191,8 @@ func begin_drag(at: Vector2) -> void:
 func drag_to(at: Vector2, usec: int) -> void:
 	if not _dragging or _ended:
 		return
-	_card.position = at - _drag_offset
-	var center := _card.position + CARD_SIZE * 0.5
+	_held.position = at - _drag_offset
+	var center := _held.position + CARD_SIZE * 0.5
 	var scanner_left := _scanner.position.x
 	var scanner_right := _scanner.position.x + _scanner.size.x
 	var slot_y := _scanner.position.y + _scanner.size.y * 0.5
@@ -127,7 +211,7 @@ func release() -> void:
 		return
 	_dragging = false
 	if not _ended and _entered:
-		_reject("Keep dragging all the way through the scanner!")
+		_reject("Keep dragging all the way through!")
 	elif not _ended:
 		_reset_card()
 
@@ -137,129 +221,180 @@ func _judge_swipe(speed: float) -> void:
 	_last_speed = speed
 	_meter.queue_redraw()
 	if not _aligned:
-		_reject("Missed the slot — line the card up with the scanner.")
+		_reject("Missed the slot!")
 	elif speed < SPEED_MIN[difficulty]:
-		_reject("▼ Too slow — swipe faster.")
+		_reject("▼ Too slow!")
 	elif speed > SPEED_MAX[difficulty]:
-		_reject("▲ Too fast — swipe slower.")
+		_reject("▲ Too fast!")
+	elif _held != _card:
+		_reject("✗ Card declined!\nThat's not your Aggie Card.")
 	else:
-		_light.text = "✔"
+		_light.text = "✓"
 		_light.add_theme_color_override("font_color", Color("#73e6a8"))
-		_card.position.x = _scanner.position.x + _scanner.size.x + 40.0
-		_finish_round(true, "✔ Access granted — you're in!")
+		_held.position.x = _scanner.position.x + _scanner.size.x + 40.0
+		_finish_round(true, "✓ Aggie Cash accepted!\nEnjoy your coffee!")
 
 
 func _reject(message: String) -> void:
-	_status_label.text = message
-	_status_label.add_theme_color_override("font_color", Color("#ffb38a"))
-	_light.text = "✖"
+	_pop(message, Color("#ffb38a"), 28)
+	_light.text = "✗"
 	_light.add_theme_color_override("font_color", Color("#ff9e9e"))
 	_reset_card()
 
 
+## Shows a message in the middle of the screen; it fades on its own.
+func _pop(message: String, color: Color, font_size: int) -> void:
+	_status_label.text = message
+	_status_label.add_theme_color_override("font_color", color)
+	_status_label.add_theme_font_size_override("font_size", font_size)
+	_set_shadow(_status_label, font_size)
+	_status_label.modulate.a = 1.0
+	_pop_left = POP_SECONDS
+
+
+## Puts the held card back in its wallet slot.
 func _reset_card() -> void:
 	_dragging = false
 	_entered = false
-	_card.position = CARD_HOME
+	if _held != null:
+		_held.position = card_home(_held)
+		_held.z_index = 0
+		_held = null
+
+
+func _wallet_slot(slot: int) -> Vector2:
+	return WALLET_POS + Vector2(4.0 + 2.0 * slot, -14.0 + 6.0 * slot) * PX
 
 
 func _build_ui() -> void:
-	var background := ColorRect.new()
-	background.color = Color("#13202b")
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	# Pixel art stays crisp only with nearest filtering; children inherit it.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_apply_pixel_font()
 
-	var sidewalk := ColorRect.new()
-	sidewalk.color = Color("#1d2f3d")
-	sidewalk.position = Vector2(0.0, 600.0)
-	sidewalk.size = Vector2(1280.0, 120.0)
-	sidewalk.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(sidewalk)
+	add_child(_pixel_rect(BACKGROUND_TEXTURE, Vector2.ZERO, Vector2(1280.0, 720.0)))
 
-	var title := Label.new()
-	title.text = "SWIPE CARD"
-	title.position = Vector2(48, 35)
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color("#f5f7ff"))
-	add_child(title)
-
-	var instruction := Label.new()
-	instruction.text = "One smooth swipe through the scanner."
-	instruction.position = Vector2(48, 92)
-	instruction.add_theme_font_size_override("font_size", 20)
-	instruction.add_theme_color_override("font_color", Color("#b8d4e6"))
-	add_child(instruction)
-
-	_timer_label = Label.new()
-	_timer_label.position = Vector2(48, 132)
-	_timer_label.add_theme_font_size_override("font_size", 22)
-	_timer_label.add_theme_color_override("font_color", Color("#ffd166"))
-	_timer_label.visible = show_internal_timer
-	add_child(_timer_label)
-
-	_scanner = Panel.new()
-	_scanner.position = SCANNER_RECT.position
-	_scanner.size = SCANNER_RECT.size
-	_scanner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_scanner.add_theme_stylebox_override("panel", _box(Color("#2b3440"), Color("#8aa0b8")))
+	_scanner = _pixel_rect(READER_TEXTURE, SCANNER_RECT.position, SCANNER_RECT.size)
 	add_child(_scanner)
+	# The art already has the slot; this extends it past both sides of the reader.
 	_slot = ColorRect.new()
 	_slot.color = Color("#0a0d12")
-	_slot.position = Vector2(-20.0, SCANNER_RECT.size.y * 0.5 - SLOT_HEIGHT * 0.5)
+	_slot.position = Vector2(-20.0, SLOT_TOP)
 	_slot.size = Vector2(SCANNER_RECT.size.x + 40.0, SLOT_HEIGHT)
 	_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_scanner.add_child(_slot)
 	_light = Label.new()
 	_light.text = "●"
-	_light.position = Vector2(64.0, 20.0)
-	_light.add_theme_font_size_override("font_size", 30)
+	_light.position = Vector2(62.0, 18.0)
+	_light.add_theme_font_size_override("font_size", 28)
 	_light.add_theme_color_override("font_color", Color("#ffd166"))
 	_scanner.add_child(_light)
 	var arrow := Label.new()
-	arrow.text = "SWIPE  →"
-	arrow.position = Vector2(30.0, SCANNER_RECT.size.y - 60.0)
-	arrow.add_theme_font_size_override("font_size", 20)
-	arrow.add_theme_color_override("font_color", Color("#c8d6e5"))
+	arrow.text = "SWIPE →"
+	arrow.position = Vector2(20.0, -34.0)
+	arrow.add_theme_font_size_override("font_size", 21)
+	arrow.add_theme_color_override("font_color", Color("#1e1d22"))
 	_scanner.add_child(arrow)
 
-	_card = Panel.new()
-	_card.size = CARD_SIZE
-	_card.mouse_default_cursor_shape = Control.CURSOR_DRAG
-	_card.add_theme_stylebox_override("panel", _box(Color("#1f4e8c"), Color("#ffd166")))
-	_card.gui_input.connect(_on_card_input)
-	add_child(_card)
-	var card_text := Label.new()
-	card_text.text = "AGGIE CARD\nUC DAVIS"
-	card_text.position = Vector2(18.0, 22.0)
-	card_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card_text.add_theme_font_size_override("font_size", 20)
-	card_text.add_theme_color_override("font_color", Color("#ffd166"))
-	_card.add_child(card_text)
-	var stripe := ColorRect.new()
-	stripe.color = Color("#0a0d12")
-	stripe.position = Vector2(0.0, CARD_SIZE.y - 30.0)
-	stripe.size = Vector2(CARD_SIZE.x, 14.0)
-	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_card.add_child(stripe)
+	# Wallet: back, then the cards from the back slot forward, then the pocket.
+	add_child(_pixel_rect(WALLET_BACK_TEXTURE, WALLET_POS, Vector2(60.0, 40.0) * PX))
+	for i: int in DECOYS[difficulty].size() + 1:
+		var card := _pixel_rect(null, Vector2.ZERO, CARD_SIZE)
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		card.mouse_default_cursor_shape = Control.CURSOR_DRAG
+		card.gui_input.connect(_on_card_input.bind(card))
+		add_child(card)
+		_cards.append(card)
+	var pocket := _pixel_rect(WALLET_FRONT_TEXTURE, WALLET_POS + Vector2(0.0, 10.0 * PX), Vector2(60.0, 30.0) * PX)
+	# The pocket hides the lower part of each card, and so blocks clicks there.
+	pocket.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(pocket)
 
+	# Top left: the timer, with the swipe speed meter under it.
+	_timer_label = _text_label(28, Color("#ffd166"))
+	_timer_label.position = Vector2(32, 24)
+	_timer_label.visible = show_internal_timer
+	add_child(_timer_label)
 	_meter = Control.new()
-	_meter.position = Vector2(820.0, 300.0)
+	_meter.position = Vector2(32.0, 70.0)
 	_meter.size = Vector2(400.0, 90.0)
 	_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_meter.draw.connect(_draw_meter)
 	add_child(_meter)
 
-	_status_label = Label.new()
-	_status_label.position = Vector2(48, 540)
-	_status_label.size = Vector2(1180, 48)
-	_status_label.add_theme_font_size_override("font_size", 22)
+	_dim = ColorRect.new()
+	_dim.color = Color(0.0, 0.0, 0.0, 0.0)
+	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_dim)
+
+	_status_label = _text_label(28, Color.WHITE)
+	_status_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status_label.modulate.a = 0.0
 	add_child(_status_label)
+
+	# The intro: title and instruction, centred, then they fade.
+	_intro = VBoxContainer.new()
+	_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_intro.alignment = BoxContainer.ALIGNMENT_CENTER
+	_intro.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_intro.add_theme_constant_override("separation", 24)
+	var title := _text_label(70, Color("#ffbf00"))
+	title.text = "SWIPE CARD"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_intro.add_child(title)
+	var instruction := _text_label(28, Color.WHITE)
+	instruction.text = "Find your Aggie Card, then swipe!"
+	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_intro.add_child(instruction)
+	add_child(_intro)
+
+
+func _text_label(font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	_set_shadow(label, font_size)
+	return label
+
+
+## A dark drop shadow one font pixel down and right, so text reads over the art.
+func _set_shadow(label: Label, font_size: int) -> void:
+	var offset := maxi(font_size / 7, 1)
+	label.add_theme_color_override("font_shadow_color", SHADOW)
+	label.add_theme_constant_override("shadow_offset_x", offset)
+	label.add_theme_constant_override("shadow_offset_y", offset)
+
+
+## Uses AggiePixel for every label and drawn string in this microgame, scaled
+## by whole pixels, with the engine font as a fallback for anything it lacks.
+func _apply_pixel_font() -> void:
+	var font: FontFile = PIXEL_FONT
+	font.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_INTEGER_ONLY
+	if font.fallbacks.is_empty():
+		font.fallbacks = [ThemeDB.fallback_font]
+	var pixel_theme := Theme.new()
+	pixel_theme.default_font = font
+	pixel_theme.default_font_size = 21
+	theme = pixel_theme
+
+
+func _pixel_rect(texture: Texture2D, at: Vector2, rect_size: Vector2) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = texture
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_SCALE
+	rect.position = at
+	rect.size = rect_size
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect
 
 
 func _draw_meter() -> void:
 	var font := get_theme_default_font()
-	_meter.draw_string(font, Vector2(0.0, 18.0), "SWIPE SPEED", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("#b8d4e6"))
+	_shadowed_string(font, Vector2(0.0, 16.0), "SWIPE SPEED", 14, Color("#f5f7ff"))
 	var bar := Rect2(0.0, 30.0, _meter.size.x, 26.0)
 	_meter.draw_rect(bar, Color("#0e161e"))
 	var low := clampf(SPEED_MIN[difficulty] / METER_MAX_SPEED, 0.0, 1.0) * bar.size.x
@@ -271,23 +406,52 @@ func _draw_meter() -> void:
 		_meter.draw_line(Vector2(x, bar.position.y), Vector2(minf(x + 10.0, high), bar.end.y), Color("#73e6a8"), 2.0)
 		x += 14.0
 	_meter.draw_rect(bar, Color("#8aa0b8"), false, 2.0)
-	_meter.draw_string(font, Vector2(0.0, 80.0), "slow", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#8aa0b8"))
-	_meter.draw_string(font, Vector2(bar.size.x - 34.0, 80.0), "fast", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#8aa0b8"))
+	_shadowed_string(font, Vector2(0.0, 80.0), "SLOW", 14, Color("#f5f7ff"))
+	_shadowed_string(font, Vector2(bar.size.x - 46.0, 80.0), "FAST", 14, Color("#f5f7ff"))
 	if _last_speed >= 0.0:
 		var px := clampf(_last_speed / METER_MAX_SPEED, 0.0, 1.0) * bar.size.x
 		_meter.draw_line(Vector2(px, bar.position.y - 6.0), Vector2(px, bar.end.y + 6.0), Color("#ffffff"), 4.0)
+
+
+func _shadowed_string(font: Font, at: Vector2, text: String, font_size: int, color: Color) -> void:
+	var offset := float(maxi(font_size / 7, 1))
+	_meter.draw_string(font, at + Vector2(offset, offset), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SHADOW)
+	_meter.draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
 func _start_round() -> void:
 	_ended = false
 	_elapsed = 0.0
 	_seconds_left = DURATIONS[difficulty]
+	_intro_left = INTRO_SECONDS
+	_intro.visible = true
+	_intro.modulate.a = 1.0
+	_pop_left = 0.0
+	_status_label.text = ""
 	_last_speed = -1.0
 	_scanner.position = SCANNER_RECT.position
+	_held = null
 	_reset_card()
-	_status_label.text = "Grab the card and swipe it left → right through the slot."
-	_status_label.add_theme_color_override("font_color", Color("#b8d4e6"))
+	_deal_cards()
+	_update_dim()
+	_timer_label.text = "TIME %.1f" % _seconds_left
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
+
+
+## Shuffles the cards into the front-most wallet slots.
+func _deal_cards() -> void:
+	var ids: Array = ["aggie"] + DECOYS[difficulty]
+	ids.shuffle()
+	var first_slot := WALLET_SLOTS - ids.size()
+	for i: int in ids.size():
+		var card := _cards[i]
+		card.texture = CARD_TEXTURES[ids[i]]
+		card.set_meta("id", ids[i])
+		card.set_meta("home", _wallet_slot(first_slot + i))
+		card.position = card_home(card)
+		card.z_index = 0
+		if ids[i] == "aggie":
+			_card = card
 
 
 func _finish_round(success: bool, message: String) -> void:
@@ -295,15 +459,6 @@ func _finish_round(success: bool, message: String) -> void:
 		return
 	_ended = true
 	_dragging = false
-	_status_label.text = message
-	_status_label.add_theme_color_override("font_color", Color("#73e6a8") if success else Color("#ff9e9e"))
+	_intro.visible = false
+	_pop(message, Color("#73e6a8") if success else Color("#ff9e9e"), 42)
 	round_completed.emit(success)
-
-
-func _box(background: Color, border: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(12)
-	return style

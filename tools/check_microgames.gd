@@ -11,7 +11,8 @@ extends SceneTree
 ##             difficulty property, get_round_seconds() > 0
 ##   tick      time_changed fires while the round runs
 ##   timeout   with no input, round_completed fires exactly once, by about
-##             get_round_seconds() (game time). Stay Focused reports a result
+##             get_round_seconds() (game time), plus get_intro_seconds() for
+##             microgames that have one. Stay Focused reports a result
 ##             from its own rules (missed thoughts), so WIN or FAIL both pass.
 ##   win/fail  calling the microgame's _finish_round(true/false, ...) emits
 ##             round_completed with the same value. This checks the wiring of
@@ -67,7 +68,9 @@ func _check_one(entry: Dictionary, difficulty: int) -> void:
 	microgame.time_changed.connect(func(_l: float, _r: float) -> void: log["ticks"] += 1)
 	root.add_child(microgame)
 	Engine.time_scale = TIME_SCALE
-	var deadline_ms := Time.get_ticks_msec() + int((round_seconds + TIMEOUT_GRACE) / TIME_SCALE * 1000.0) + 500
+	# Some microgames show an intro before their timer starts.
+	var intro_seconds: float = microgame.call("get_intro_seconds") if microgame.has_method("get_intro_seconds") else 0.0
+	var deadline_ms := Time.get_ticks_msec() + int((intro_seconds + round_seconds + TIMEOUT_GRACE) / TIME_SCALE * 1000.0) + 500
 	while log["results"].is_empty() and Time.get_ticks_msec() < deadline_ms:
 		await process_frame
 	# Keep running a moment to catch a second (duplicate) emission.
@@ -84,7 +87,7 @@ func _check_one(entry: Dictionary, difficulty: int) -> void:
 	var timeout := ""
 	if results.is_empty():
 		timeout = "NONE"
-		notes.append("round_completed did not fire within %.1f s" % (round_seconds + TIMEOUT_GRACE))
+		notes.append("round_completed did not fire within %.1f s" % (intro_seconds + round_seconds + TIMEOUT_GRACE))
 	elif results.size() > 1:
 		timeout = "x%d" % results.size()
 		notes.append("round_completed fired %d times" % results.size())
