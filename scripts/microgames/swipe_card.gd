@@ -8,8 +8,10 @@ extends Control
 ## pulled, but only the Aggie Card is accepted. A bad swipe or the wrong card
 ## goes back into the wallet so you can try again until time runs out.
 ##
-## The round opens with a big title and instruction that fade out; the timer
-## starts after that. Results pop up in the middle of the screen and fade.
+## The round opens outside the Peet's on campus: the title and instruction show
+## in the sky while a student walks up the steps and in through the door, then
+## the scene fades to the counter and the timer starts. A click skips this.
+## Results pop up in the middle of the screen and fade.
 ##
 ## Art is pixel art drawn at 1/5 scale (tools/art/gen_swipe_card_art.py) and
 ## shown at 5x with nearest filtering. Text uses the AggiePixel font
@@ -28,8 +30,17 @@ signal time_changed(seconds_left: float, round_seconds: float)
 @export var show_internal_timer: bool = true
 
 const DURATIONS: Array[float] = [9.0, 8.0, 7.0]
-const INTRO_SECONDS := 1.6
-const INTRO_FADE := 0.4
+## Intro timeline, in seconds: the walk, the door, fade to black, fade in.
+const INTRO_SECONDS := 3.2
+const WALK_END := 2.2
+const DOOR_END := 2.5
+const BLACK_AT := 2.85
+const STEP_SECONDS := 0.14
+## The student's feet, in exterior-art pixels: from below the steps to the door.
+const WALK_PATH: Array[Vector2] = [Vector2(130, 150), Vector2(150, 126), Vector2(211, 118)]
+const WALK_FRAMES := [1, 0, 2, 0]
+const WALKER_SIZE := Vector2(12.0, 18.0)
+const DOOR_POS := Vector2(196.0, 74.0)
 const POP_SECONDS := 1.4
 const POP_FADE := 0.4
 ## Accepted swipe speed through the scanner, in pixels per real second.
@@ -40,6 +51,13 @@ const ALIGN_TOLERANCE: Array[float] = [70.0, 55.0, 45.0]
 const DECOYS := [["credit"], ["credit", "rewards"], ["credit", "rewards", "license"]]
 const ART := "res://assets/art/microgames/swipe_card/"
 const BACKGROUND_TEXTURE := preload(ART + "coffee_counter_bg.png")
+const EXTERIOR_TEXTURE := preload(ART + "peets_exterior.png")
+const DOOR_OPEN_TEXTURE := preload(ART + "peets_door_open.png")
+const WALKER_TEXTURES := [
+	preload(ART + "student_walk_0.png"),
+	preload(ART + "student_walk_1.png"),
+	preload(ART + "student_walk_2.png"),
+]
 const READER_TEXTURE := preload(ART + "card_reader.png")
 const WALLET_BACK_TEXTURE := preload(ART + "wallet_back.png")
 const WALLET_FRONT_TEXTURE := preload(ART + "wallet_front.png")
@@ -85,8 +103,13 @@ var _scanner: TextureRect
 var _slot: ColorRect
 var _light: Label
 var _timer_label: Label
+## The intro's title and instruction.
 var _intro: Control
-## Darkens the scene behind the intro and result messages so they read clearly.
+var _exterior: Control
+var _walker: TextureRect
+var _door: TextureRect
+var _fade: ColorRect
+## Darkens the scene behind result messages so they read clearly.
 var _dim: ColorRect
 ## Result messages; they pop up in the middle of the screen and fade.
 var _status_label: Label
@@ -118,13 +141,49 @@ func card_id(card: TextureRect) -> String:
 ## Ends the intro at once. Public for tests.
 func skip_intro() -> void:
 	_intro_left = 0.0
-	_intro.visible = false
-	_update_dim()
+	_update_intro()
 
 
 func _update_dim() -> void:
-	var intro_alpha := _intro.modulate.a if _intro.visible else 0.0
-	_dim.color.a = 0.55 * maxf(intro_alpha, _status_label.modulate.a)
+	_dim.color.a = 0.55 * _status_label.modulate.a
+
+
+## Lays out the intro for the current moment of its timeline.
+func _update_intro() -> void:
+	var t := INTRO_SECONDS - _intro_left
+	var running := _intro_left > 0.0
+	_intro.visible = running
+	_intro.modulate.a = clampf((DOOR_END - t) / (DOOR_END - WALK_END), 0.0, 1.0)
+	_exterior.visible = running and t < BLACK_AT
+	_walker.visible = t < WALK_END
+	if _walker.visible:
+		var feet := _walk_point(t / WALK_END)
+		_walker.position = (feet - Vector2(WALKER_SIZE.x * 0.5, WALKER_SIZE.y)) * PX
+		_walker.texture = WALKER_TEXTURES[WALK_FRAMES[int(t / STEP_SECONDS) % WALK_FRAMES.size()]]
+	_door.visible = t >= WALK_END - 0.1
+	var black := 0.0
+	if running and t >= DOOR_END:
+		if t < BLACK_AT:
+			black = (t - DOOR_END) / (BLACK_AT - DOOR_END)
+		else:
+			black = 1.0 - (t - BLACK_AT) / (INTRO_SECONDS - BLACK_AT)
+	_fade.color.a = clampf(black, 0.0, 1.0)
+
+
+## A point along WALK_PATH, 0 at the start and 1 at the door.
+func _walk_point(progress: float) -> Vector2:
+	progress = clampf(progress, 0.0, 1.0)
+	var lengths: Array[float] = []
+	var total := 0.0
+	for i: int in WALK_PATH.size() - 1:
+		lengths.append(WALK_PATH[i].distance_to(WALK_PATH[i + 1]))
+		total += lengths[i]
+	var along := progress * total
+	for i: int in lengths.size():
+		if along <= lengths[i] or i == lengths.size() - 1:
+			return WALK_PATH[i].lerp(WALK_PATH[i + 1], clampf(along / lengths[i], 0.0, 1.0))
+		along -= lengths[i]
+	return WALK_PATH[-1]
 
 
 func _ready() -> void:
@@ -142,8 +201,7 @@ func _process(delta: float) -> void:
 		return
 	if _intro_left > 0.0:
 		_intro_left = maxf(0.0, _intro_left - delta)
-		_intro.modulate.a = clampf(_intro_left / INTRO_FADE, 0.0, 1.0)
-		_intro.visible = _intro_left > 0.0
+		_update_intro()
 		return
 	_elapsed += delta
 	_seconds_left = maxf(0.0, _seconds_left - delta)
@@ -156,6 +214,11 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _intro_left > 0.0 and not _ended:
+		if event is InputEventMouseButton and event.pressed:
+			skip_intro()
+			get_viewport().set_input_as_handled()
+		return
 	if not _dragging or _ended:
 		return
 	if event is InputEventMouseMotion:
@@ -321,6 +384,22 @@ func _build_ui() -> void:
 	_meter.draw.connect(_draw_meter)
 	add_child(_meter)
 
+	# The intro's outside scene, over everything until the fade.
+	_exterior = Control.new()
+	_exterior.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_exterior.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_exterior.add_child(_pixel_rect(EXTERIOR_TEXTURE, Vector2.ZERO, Vector2(1280.0, 720.0)))
+	_door = _pixel_rect(DOOR_OPEN_TEXTURE, DOOR_POS * PX, Vector2(30.0, 44.0) * PX)
+	_exterior.add_child(_door)
+	_walker = _pixel_rect(WALKER_TEXTURES[0], Vector2.ZERO, WALKER_SIZE * PX)
+	_exterior.add_child(_walker)
+	add_child(_exterior)
+	_fade = ColorRect.new()
+	_fade.color = Color(0.0, 0.0, 0.0, 0.0)
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_fade)
+
 	_dim = ColorRect.new()
 	_dim.color = Color(0.0, 0.0, 0.0, 0.0)
 	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -334,10 +413,12 @@ func _build_ui() -> void:
 	_status_label.modulate.a = 0.0
 	add_child(_status_label)
 
-	# The intro: title and instruction, centred, then they fade.
+	# The intro's title and instruction, in the sky above the shop.
 	_intro = VBoxContainer.new()
-	_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_intro.alignment = BoxContainer.ALIGNMENT_CENTER
+	_intro.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_intro.offset_top = 36.0
+	_intro.offset_bottom = 236.0
+	_intro.alignment = BoxContainer.ALIGNMENT_BEGIN
 	_intro.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_intro.add_theme_constant_override("separation", 24)
 	var title := _text_label(70, Color("#ffbf00"))
@@ -424,8 +505,6 @@ func _start_round() -> void:
 	_elapsed = 0.0
 	_seconds_left = DURATIONS[difficulty]
 	_intro_left = INTRO_SECONDS
-	_intro.visible = true
-	_intro.modulate.a = 1.0
 	_pop_left = 0.0
 	_status_label.text = ""
 	_last_speed = -1.0
@@ -433,6 +512,7 @@ func _start_round() -> void:
 	_held = null
 	_reset_card()
 	_deal_cards()
+	_update_intro()
 	_update_dim()
 	_timer_label.text = "TIME %.1f" % _seconds_left
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
@@ -459,6 +539,7 @@ func _finish_round(success: bool, message: String) -> void:
 		return
 	_ended = true
 	_dragging = false
-	_intro.visible = false
+	_intro_left = 0.0
+	_update_intro()
 	_pop(message, Color("#73e6a8") if success else Color("#ff9e9e"), 42)
 	round_completed.emit(success)

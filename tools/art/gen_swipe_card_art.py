@@ -444,8 +444,204 @@ def wallet_front():
     return img
 
 
+EXT = {
+    "sky": (178, 222, 244), "sky_lt": (216, 238, 250),
+    "roof": (93, 90, 87), "roof_dk": (69, 66, 63), "roof_lt": (119, 115, 110),
+    "cedar": (184, 114, 74), "cedar_dk": (143, 84, 52), "cedar_lt": (208, 138, 92),
+    "red": (168, 66, 58), "red_dk": (127, 47, 41),
+    "trim": (242, 240, 234), "trim_dk": (204, 200, 192),
+    "awning": (43, 95, 168), "awning_dk": (30, 69, 128), "awning_lt": (74, 124, 196),
+    "glass": (47, 79, 85), "glass_lt": (111, 154, 162), "glass_hi": (198, 221, 224),
+    "concrete": (217, 214, 207), "concrete_dk": (184, 180, 171), "concrete_lt": (236, 235, 230), "step_sh": (169, 165, 156),
+    "trunk": (91, 70, 54), "trunk_dk": (64, 48, 36),
+    "leaf": (63, 107, 53), "leaf_dk": (43, 77, 37), "leaf_lt": (92, 140, 72),
+    "blossom": (244, 242, 234), "blossom_dk": (226, 218, 190),
+    "chair": (196, 81, 46), "chair_dk": (150, 58, 30),
+    "rail": (216, 221, 226), "rail_dk": (154, 161, 168),
+    "sign": (29, 42, 51), "poster": (230, 160, 60), "poster_b": (60, 120, 180),
+    "interior": (70, 48, 34), "interior_lt": (150, 104, 66),
+    # the student
+    "cap": (240, 240, 236), "cap_dk": (200, 200, 196), "hair": (52, 40, 32), "skin": (214, 168, 132),
+    "shirt": (150, 196, 228), "shirt_dk": (112, 158, 196), "pack": (150, 150, 156), "pack_dk": (108, 108, 116),
+    "pants": (44, 48, 62), "shoe": (28, 28, 32),
+}
+DOOR_RECT = (196, 74, 226, 118)  # the double doors in the exterior art
+
+
+def exterior():
+    """Outside the Peet's Coffee on campus, 256x144."""
+    E = EXT
+    img = Image.new("RGB", (W, H), E["sky"])
+    vgrad(img, 0, 0, W, 60, E["sky_lt"], E["sky"])
+
+    # Upper roof with shingle rows, then its white fascia.
+    rect(img, 70, 14, W, 30, E["roof"])
+    for y in range(15, 30, 3):
+        rect(img, 70, y, W, y + 1, E["roof_dk"])
+        for x in range(70 + (y % 2) * 3, W, 6):
+            px(img, x, y + 1, E["roof_lt"])
+    rect(img, 66, 30, W, 32, E["trim"])
+    rect(img, 66, 32, W, 33, E["trim_dk"])
+
+    # Cedar shingle walls.
+    rect(img, 58, 33, W, 96, E["cedar"])
+    for row, y in enumerate(range(33, 96, 3)):
+        rect(img, 58, y + 2, W, y + 3, E["cedar_dk"])
+        for x in range(58 + (row % 2) * 2, W, 4):
+            rect(img, x, y, x + 1, y + 2, E["cedar_dk"])
+            px(img, x + 1, y, E["cedar_lt"])
+    # Upper window in the gable.
+    rect(img, 72, 36, 94, 50, E["trim"])
+    rect(img, 74, 38, 92, 48, E["glass_lt"])
+    rect(img, 82, 38, 84, 48, E["trim"])
+    rect(img, 74, 38, 92, 40, E["glass_hi"])
+
+    # Lower roof over the front, with its fascia.
+    rect(img, 118, 33, W, 50, E["roof"])
+    for y in range(34, 50, 3):
+        rect(img, 118, y, W, y + 1, E["roof_dk"])
+    rect(img, 116, 50, W, 52, E["trim"])
+    rect(img, 116, 52, W, 53, E["trim_dk"])
+
+    # Red lower wall with white trim, left of the storefront.
+    rect(img, 58, 88, 188, 118, E["red"])
+    rect(img, 58, 86, 188, 88, E["trim"])
+    rect(img, 58, 114, 188, 118, E["trim_dk"])
+    speckle(img, 58, 88, 188, 114, [E["red_dk"]], 0.06, 11)
+
+    # Small side window with a blue awning.
+    for i in range(10):
+        rect(img, 94 + i // 3, 70 + i, 120 - i // 3, 71 + i, E["awning"])
+    rect(img, 94, 79, 120, 81, E["awning_dk"])
+    rect(img, 98, 82, 116, 106, E["trim"])
+    rect(img, 100, 84, 114, 104, E["glass"])
+    rect(img, 100, 84, 114, 87, E["glass_lt"])
+
+    # Shop sign: a dark square with the shop name.
+    rect(img, 124, 72, 156, 88, E["sign"])
+    outline(img, 124, 72, 156, 88, E["trim_dk"])
+    name = "Peet's"
+    write(img, 140 - width(name, SIGN) // 2, 77, name, E["trim"], SIGN)
+
+    # Storefront: big blue awning, white frames, glass, double doors.
+    rect(img, 184, 60, W, 68, E["awning"])
+    rect(img, 184, 60, W, 62, E["awning_lt"])
+    rect(img, 184, 68, W, 71, E["awning_dk"])
+    rect(img, 188, 71, W, 118, E["trim"])
+    for x0, x1 in ((190, 195), (228, 241), (243, 255)):
+        rect(img, x0, 74, x1, 116, E["glass"])
+        rect(img, x0, 74, x1, 78, E["glass_lt"])
+    rect(img, 230, 86, 236, 94, E["poster"])
+    rect(img, 245, 84, 251, 92, E["poster_b"])
+    x0, y0, x1, y1 = DOOR_RECT
+    for dx0, dx1 in ((x0, x0 + 14), (x0 + 16, x1)):
+        rect(img, dx0, y0, dx1, y1, E["trim"])
+        rect(img, dx0 + 2, y0 + 2, dx1 - 2, y1 - 2, E["glass"])
+        for i in range(8):
+            px(img, dx0 + 3 + i, y0 + 14 - i, E["glass_hi"])
+    rect(img, x0 + 12, y0 + 22, x0 + 13, y0 + 28, E["rail_dk"])
+    rect(img, x0 + 17, y0 + 22, x0 + 18, y0 + 28, E["rail_dk"])
+
+    # Ground: a landing, then three steps down to the sidewalk.
+    rect(img, 40, 118, W, 126, E["concrete"])
+    rect(img, 40, 118, W, 119, E["concrete_lt"])
+    for i, y in enumerate((126, 132, 138)):
+        rect(img, 56 - i * 4, y, W, y + 6, E["concrete"])
+        rect(img, 56 - i * 4, y, W, y + 1, E["concrete_lt"])
+        rect(img, 56 - i * 4, y + 5, W, y + 6, E["step_sh"])
+    speckle(img, 40, 118, W, H, [E["concrete_dk"]], 0.05, 12)
+
+    # Tree and the white flowering shrub on the left.
+    rect(img, 22, 0, 31, 104, E["trunk"])
+    rect(img, 22, 0, 24, 104, E["trunk_dk"])
+    rng = random.Random(13)
+    for y in range(0, 34):
+        for x in range(0, 90):
+            d = (x - 30) ** 2 / 56.0 ** 2 + (y - 4) ** 2 / 28.0 ** 2
+            if d < 1.0 - rng.random() * 0.15:
+                shade = E["leaf_lt"] if y < 10 and rng.random() < 0.4 else rng.choice([E["leaf"], E["leaf"], E["leaf_dk"]])
+                px(img, x, y, shade)
+    for y in range(44, 100):
+        for x in range(0, 48):
+            if (x - 18) ** 2 / 30.0 ** 2 + (y - 72) ** 2 / 28.0 ** 2 < 1.0 and rng.random() < 0.9:
+                px(img, x, y, rng.choice([E["blossom"], E["blossom"], E["blossom_dk"], E["leaf"]]))
+
+    # Low concrete wall in front, the handrail and a bollard.
+    rect(img, 0, 100, 54, H, E["concrete_dk"])
+    rect(img, 0, 100, 54, 102, E["concrete_lt"])
+    rect(img, 0, 120, 54, 121, E["step_sh"])
+    rect(img, 48, 94, 68, 96, E["rail"])
+    for x in (48, 66):
+        rect(img, x, 94, x + 2, 132, E["rail"])
+        rect(img, x + 1, 96, x + 2, 132, E["rail_dk"])
+    rect(img, 246, 104, 250, 118, E["trim"])
+    rect(img, 249, 104, 250, 118, E["trim_dk"])
+
+    # Patio chairs by the wall.
+    for cx in (70, 82):
+        rect(img, cx, 104, cx + 8, 106, E["chair"])
+        rect(img, cx, 106, cx + 1, 118, E["chair_dk"])
+        rect(img, cx + 7, 106, cx + 8, 118, E["chair_dk"])
+        rect(img, cx, 98, cx + 1, 104, E["chair"])
+    return img
+
+
+def door_open():
+    """The left door swung open, 30x44, laid over DOOR_RECT."""
+    E = EXT
+    x0, y0, x1, y1 = DOOR_RECT
+    img = Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+    rect(img, 0, 0, 14, 44, E["trim"])
+    vgrad(img, 2, 2, 12, 42, E["interior_lt"], E["interior"])
+    rect(img, 0, 0, 3, 44, E["trim_dk"])  # the open door, edge-on
+    return img
+
+
+def walker(frame):
+    """The student seen from behind, 12x18. Frame 0 stands, 1 and 2 step."""
+    E = EXT
+    img = Image.new("RGBA", (12, 18), (0, 0, 0, 0))
+    rect(img, 3, 0, 9, 3, E["cap"])
+    rect(img, 3, 2, 9, 3, E["cap_dk"])
+    rect(img, 3, 3, 9, 5, E["hair"])
+    rect(img, 4, 5, 8, 6, E["skin"])
+    rect(img, 2, 6, 10, 12, E["shirt"])
+    rect(img, 1, 7, 2, 11, E["skin"])
+    rect(img, 10, 7, 11, 11, E["skin"])
+    rect(img, 3, 6, 9, 12, E["pack"])
+    rect(img, 3, 11, 9, 12, E["pack_dk"])
+    px(img, 3, 6, E["pack_dk"])
+    px(img, 8, 6, E["pack_dk"])
+    rect(img, 3, 12, 9, 15, E["pants"])
+    legs = {0: ((3, 5), (7, 9)), 1: ((2, 4), (7, 9)), 2: ((3, 5), (8, 10))}[frame]
+    lifts = {0: (0, 0), 1: (1, 0), 2: (0, 1)}[frame]
+    for (lx0, lx1), lift in zip(legs, lifts):
+        rect(img, lx0, 15, lx1, 17 - lift, E["pants"])
+        rect(img, lx0, 17 - lift, lx1, 18 - lift, E["shoe"])
+    outline_alpha(img, P["ink"])
+    return img
+
+
+def outline_alpha(img, color):
+    """Adds a 1 px outline around the opaque pixels of a sprite."""
+    src = img.copy()
+    for y in range(img.height):
+        for x in range(img.width):
+            if src.getpixel((x, y))[3]:
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < img.width and 0 <= ny < img.height and src.getpixel((nx, ny))[3]:
+                    img.putpixel((x, y), color + (255,))
+                    break
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    exterior().save(OUT / "peets_exterior.png")
+    door_open().save(OUT / "peets_door_open.png")
+    for frame in range(3):
+        walker(frame).save(OUT / f"student_walk_{frame}.png")
     background().save(OUT / "coffee_counter_bg.png")
     terminal().save(OUT / "card_reader.png")
     aggie_card().save(OUT / "aggie_card.png")

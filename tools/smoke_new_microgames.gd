@@ -69,12 +69,14 @@ func _swipe_card() -> void:
 	# A real mouse press on the visible top of a card pulls it out; releasing
 	# early puts it back. The pocket hides the rest of the card and blocks clicks.
 	game = await _spawn(scene, 2)
-	# Cards cannot be pulled while the intro is on screen.
+	# During the intro the shop scene covers the counter; a click skips the
+	# intro instead of pulling a card.
+	_assert(game._exterior.visible and game._walker.visible, "swipe: intro does not show the shop and the student")
 	var intro_grab: Vector2 = game._card.get_global_rect().position + Vector2(game.CARD_SIZE.x * 0.5, 12.0)
 	await _mouse(intro_grab, true)
 	_assert(not game._dragging, "swipe: a card was pulled during the intro")
+	_assert(game._intro_left == 0.0 and not game._exterior.visible, "swipe: a click did not skip the intro")
 	await _mouse(intro_grab, false)
-	game.skip_intro()
 	var home: Vector2 = game.card_home(game._card)
 	var grab: Vector2 = game._card.get_global_rect().position + Vector2(game.CARD_SIZE.x * 0.5, 12.0)
 	await _mouse(grab, true)
