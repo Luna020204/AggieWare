@@ -39,7 +39,7 @@ const STEP_SECONDS := 0.14
 ## The student's feet, in exterior-art pixels: from below the steps to the door.
 const WALK_PATH: Array[Vector2] = [Vector2(130, 150), Vector2(150, 126), Vector2(211, 118)]
 const WALK_FRAMES := [1, 0, 2, 0]
-const WALKER_SIZE := Vector2(12.0, 18.0)
+const WALKER_SIZE := Vector2(16.0, 30.0)
 const DOOR_POS := Vector2(196.0, 74.0)
 const POP_SECONDS := 1.4
 const POP_FADE := 0.4
@@ -109,7 +109,7 @@ var _exterior: Control
 var _walker: TextureRect
 var _door: TextureRect
 var _fade: ColorRect
-## Darkens the scene behind result messages so they read clearly.
+## Darkens the scene behind the intro title and result messages so they read clearly.
 var _dim: ColorRect
 ## Result messages; they pop up in the middle of the screen and fade.
 var _status_label: Label
@@ -145,7 +145,8 @@ func skip_intro() -> void:
 
 
 func _update_dim() -> void:
-	_dim.color.a = 0.55 * _status_label.modulate.a
+	var title_alpha := _intro.modulate.a if _intro.visible else 0.0
+	_dim.color.a = maxf(0.45 * title_alpha, 0.55 * _status_label.modulate.a)
 
 
 ## Lays out the intro for the current moment of its timeline.
@@ -168,6 +169,7 @@ func _update_intro() -> void:
 		else:
 			black = 1.0 - (t - BLACK_AT) / (INTRO_SECONDS - BLACK_AT)
 	_fade.color.a = clampf(black, 0.0, 1.0)
+	_update_dim()
 
 
 ## A point along WALK_PATH, 0 at the start and 1 at the door.
@@ -413,12 +415,10 @@ func _build_ui() -> void:
 	_status_label.modulate.a = 0.0
 	add_child(_status_label)
 
-	# The intro's title and instruction, in the sky above the shop.
+	# The intro's title and instruction, centred on the screen.
 	_intro = VBoxContainer.new()
-	_intro.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_intro.offset_top = 36.0
-	_intro.offset_bottom = 236.0
-	_intro.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_intro.alignment = BoxContainer.ALIGNMENT_CENTER
 	_intro.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_intro.add_theme_constant_override("separation", 24)
 	var title := _text_label(70, Color("#ffbf00"))
