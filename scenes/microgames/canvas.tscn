@@ -11,3 +11,5 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_canvas")
 prompt = "UPLOAD"
+game_title = "CANVAS UPLOAD"
+instruction_text = "DRAG FILE.ZIP, THEN SUBMIT."

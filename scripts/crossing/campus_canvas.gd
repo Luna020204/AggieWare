@@ -2,6 +2,7 @@
 extends Control
 ## Shared rendering for the native editor preview and the running game.
 const Data = preload("res://scripts/crossing/level_data.gd")
+const RuntimeArt = preload("res://scripts/crossing/pixel_campus_renderer.gd")
 
 var level: Dictionary = {}
 var simulation: RefCounted
@@ -10,6 +11,16 @@ var grid_visible := true
 var font: Font
 var clock := 0.0
 var show_state_overlay := true
+var runtime_fullscreen := false
+var _runtime_art := RuntimeArt.new()
+
+## The adapter owns the 5x pixel surface; authored geometry stays in map units.
+func configure_runtime_view(view_size: Vector2 = Vector2(1280, 720)) -> void:
+	runtime_fullscreen = true
+	position = Vector2.ZERO
+	scale = Vector2.ONE
+	size = view_size
+	queue_redraw()
 
 func _ready() -> void:
 	clip_contents = true
@@ -21,6 +32,9 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	if level.is_empty():
+		return
+	if not edit_mode and runtime_fullscreen:
+		_runtime_art.draw_world(self, level, simulation, clock, size)
 		return
 	for row in Data.ROWS:
 		_draw_row(row)
@@ -186,6 +200,9 @@ func _arrow(p: Vector2, direction: int, color: Color) -> void:
 	draw_polyline(PackedVector2Array([p + Vector2(3 * direction, -5), p + Vector2(9 * direction, 0), p + Vector2(3 * direction, 5)]), color, 2, true)
 
 func _text(p: Vector2, value: String, size_px: int, color: Color) -> void:
+	# Tiny authoring annotations are editor-only; runtime world labels use AggiePixel.
+	if not edit_mode:
+		return
 	if font != null:
 		draw_string(font, p, value, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, color)
 

@@ -3,7 +3,7 @@ extends "res://scripts/core/microgame_base.gd"
 ## Upload the correct file, then submit; higher difficulties move the targets.
 const UI := preload("res://scripts/ui/microgame_ui.gd")
 const CardDrag := preload("res://scripts/core/card_drag.gd")
-const ROUND_SECONDS: Array[float] = [10.0, 8.0, 6.0]
+const ROUND_SECONDS: Array[float] = [9.0, 8.0, 7.0]
 const DECOY_NAMES: Array[String] = ["notes.txt", "lecture.pdf", "draft.zip"]
 
 var _zone_clock := 0.0
@@ -16,7 +16,8 @@ var _dragging_file: Control:
 var _files: Array[Control] = []
 var _timer_label: Label
 var _status_label: Label
-var _drop_zone: PanelContainer
+var _drop_zone: Control
+var _art: Control
 var _drop_zone_label: Label
 var _submit_button: Button
 var _rng := RandomNumberGenerator.new()
@@ -35,7 +36,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _update_game(delta: float) -> void:
-	_timer_label.text = "TIME  %.1f s" % _seconds_left
+	_timer_label.text = "TIME %.1f" % _seconds_left
+	_art.queue_redraw()
 	if _seconds_left <= 0.0:
 		return
 	if difficulty >= 1:
@@ -55,44 +57,67 @@ func _update_game(delta: float) -> void:
 func _build_ui() -> void:
 	_rng.randomize()
 	_drag.dropped.connect(_on_file_dropped)
-	var header := UI.build_header(self, "CANVAS", "Upload file.zip to the Canvas assignment, then submit it.", show_internal_timer)
+	UI.add_backdrop(self, "desk")
+	_art = UI.pixel_canvas(self, _draw_world)
+	var header := UI.build_header(self, "CANVAS UPLOAD", "DRAG FILE.ZIP, THEN SUBMIT.", show_internal_timer)
 	_timer_label = header.timer
-	UI.panel(self, Rect2(40, 235, 280, 350))
-	UI.label(self, "Your files", Vector2(60, 247), 20, UI.TEXT, Vector2(240, 28))
-	UI.label(self, "Drag the correct file", Vector2(60, 275), 16, UI.MUTED, Vector2(240, 24))
-	_drop_zone = UI.panel(self, Rect2(420, 255, 490, 210), Color("#20375d"), Color("#73b7ff"))
-	var drop_layout := VBoxContainer.new()
-	drop_layout.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	drop_layout.alignment = BoxContainer.ALIGNMENT_CENTER
-	drop_layout.add_theme_constant_override("separation", 8)
-	_drop_zone.add_child(drop_layout)
-	_drop_zone_label = UI.label(drop_layout, "DROP FILE HERE", Vector2.ZERO, 28, UI.TEXT, Vector2.ZERO)
+	_drop_zone = Control.new()
+	_drop_zone.position = Vector2(420, 255)
+	_drop_zone.size = Vector2(490, 210)
+	_drop_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_drop_zone)
+	_drop_zone_label = UI.label(_drop_zone, "DROP FILE.ZIP", Vector2(20, 20), 28, UI.TEXT, Vector2(450, 40))
 	_drop_zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var drop_hint := UI.label(drop_layout, "Canvas assignment", Vector2.ZERO, 18, UI.MUTED, Vector2.ZERO)
-	drop_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label = UI.label(self, "", Vector2(48, 640), 20)
+	_status_label = UI.status_label(self)
 	_submit_button = Button.new()
-	_submit_button.text = "Submit to Canvas"
+	_submit_button.text = "SUBMIT"
 	_submit_button.position = Vector2(960, 320)
 	_submit_button.size = Vector2(240, 64)
 	_submit_button.focus_mode = Control.FOCUS_NONE
-	_submit_button.add_theme_font_size_override("font_size", 20)
-	_submit_button.add_theme_stylebox_override("normal", UI.panel_style(Color("#2b7a5b"), Color("#55d69b")))
-	_submit_button.add_theme_stylebox_override("hover", UI.panel_style(Color("#3d9b72"), Color("#8af0bd")))
+	UI.flat_button(_submit_button, 28)
 	_submit_button.pressed.connect(_on_submit_pressed)
 	add_child(_submit_button)
-	UI.label(self, _difficulty_text(), Vector2(48, 682), 15, UI.MUTED)
 
+
+func _draw_world() -> void:
+	if not is_instance_valid(_drop_zone):
+		return
+	var screen := Rect2(_drop_zone.position, _drop_zone.size * _drop_zone.scale)
+	_art.draw_rect(screen.grow(15), Color("253347"))
+	_art.draw_rect(screen, Color("315b67"))
+	_art.draw_rect(Rect2(screen.position + Vector2(10, 10), Vector2(screen.size.x - 20, 5)), Color("78a2a2"))
+	var keyboard := Rect2(screen.position + Vector2(-30, screen.size.y + 15), Vector2(screen.size.x + 60, 70))
+	_art.draw_rect(keyboard, Color("475463"))
+	for row in 3:
+		for key in 14:
+			_art.draw_rect(Rect2(keyboard.position + Vector2(25 + key * 35, 10 + row * 15), Vector2(25, 8)), Color("809299"))
+	_art.draw_rect(Rect2(_submit_button.position + Vector2(5, 8), _submit_button.size), Color("243632"))
+	_art.draw_rect(Rect2(_submit_button.position, _submit_button.size), Color("358061"))
+	_art.draw_rect(Rect2(_submit_button.position + Vector2(5, 5), Vector2(_submit_button.size.x - 10, 5)), Color("7fbf96"))
+	for card: Control in _files:
+		if card != _drag.card:
+			_draw_file(card)
+	if is_instance_valid(_drag.card):
+		_draw_file(_drag.card)
+
+
+func _draw_file(card: Control) -> void:
+	var box := Rect2(card.position, card.size * card.scale)
+	_art.draw_rect(Rect2(box.position + Vector2(5, 8), box.size), Color(0.22, 0.18, 0.21, 0.5))
+	_art.draw_rect(box, Color("e8d6ac"))
+	_art.draw_rect(Rect2(box.position, Vector2(20, box.size.y)), Color("d9aa59"))
+	_art.draw_rect(Rect2(box.end - Vector2(20, box.size.y), Vector2(20, 15)), Color("b8b08c"))
+	_art.draw_rect(Rect2(box.position + Vector2(30, box.size.y - 10), Vector2(box.size.x - 50, 5)), Color("c5bd9b"))
 
 func _reset_game() -> void:
 	_drag.cancel()
 	_placed_file = null
 	_zone_clock = 0.0
 	_submit_clock = 0.0
-	_timer_label.text = "TIME  %.1f s" % _seconds_left
+	_timer_label.text = "TIME %.1f" % _seconds_left
 	UI.set_status(_status_label, "")
-	_drop_zone_label.text = "DROP FILE HERE"
-	_submit_button.text = "Submit to Canvas"
+	_drop_zone_label.text = "DROP FILE.ZIP"
+	_submit_button.text = "SUBMIT"
 	_submit_button.disabled = false
 	_drop_zone.position = Vector2(420, 255)
 	_submit_button.position = Vector2(960, 320)
@@ -100,22 +125,21 @@ func _reset_game() -> void:
 	_create_file_card("file.zip", true, Vector2(70, 310))
 	for index: int in range(difficulty + 1):
 		_create_file_card(DECOY_NAMES[index], false, Vector2(70, 374 + index * 64))
+	_art.queue_redraw()
 
 
 func _create_file_card(file_name: String, is_target: bool, card_position: Vector2) -> void:
 	var card := Button.new()
-	card.text = file_name
+	card.text = file_name.to_upper()
 	card.position = card_position
 	card.size = Vector2(220, 52)
 	card.custom_minimum_size = card.size
 	card.focus_mode = Control.FOCUS_NONE
 	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	card.add_theme_font_size_override("font_size", 18)
+	UI.flat_button(card, 21)
 	card.add_theme_color_override("font_color", Color("#152643"))
 	card.add_theme_color_override("font_hover_color", Color("#152643"))
 	card.add_theme_color_override("font_pressed_color", Color("#152643"))
-	card.add_theme_stylebox_override("normal", UI.panel_style(Color("#f1f5ff"), Color("#9bb4e3")))
-	card.add_theme_stylebox_override("hover", UI.panel_style(Color("#ffffff"), Color("#73b7ff")))
 	card.set_meta("is_target", is_target)
 	card.set_meta("origin", card_position)
 	card.gui_input.connect(_on_file_gui_input.bind(card))
@@ -144,10 +168,9 @@ func _on_file_dropped(card: Control) -> void:
 			_placed_file = card
 			CardDrag.center_on(card, _drop_zone)
 			card.z_index = 5
-			_drop_zone_label.text = "file.zip READY"
-			UI.set_status(_status_label, "Correct file — press Submit", "success")
+			_drop_zone_label.text = "READY TO SUBMIT"
 		else:
-			UI.set_status(_status_label, "That is not the assignment file", "error")
+			show_feedback("WRONG FILE!", UI.REJECT)
 			card.position = card.get_meta("origin")
 	else:
 		card.position = card.get_meta("origin")
@@ -157,21 +180,27 @@ func _on_submit_pressed() -> void:
 	if not can_interact():
 		return
 	if _placed_file == null:
-		UI.set_status(_status_label, "Drag file.zip into the drop zone first", "warning")
+		show_feedback("UPLOAD FILE.ZIP FIRST!", UI.REJECT)
 		return
-	_finish_round(true, "Submitted — Canvas upload complete!")
+	_finish_round(true, "UPLOADED!")
 
 
 func _on_timeout() -> void:
-	_finish_round(false, "Time's up — try again!")
+	_finish_round(false, "TIME'S UP!")
 
 
-func _show_result(success: bool, message: String) -> void:
+func _show_result(_success: bool, _message: String) -> void:
 	_drag.cancel()
-	UI.set_status(_status_label, message, "success" if success else "error")
+	_art.queue_redraw()
 	_submit_button.disabled = true
 	for file_card: Button in _files:
 		file_card.disabled = true
+
+
+func _on_pause_changed(paused: bool) -> void:
+	if paused:
+		_drag.cancel()
+		_art.queue_redraw()
 
 
 func _move_drop_zone() -> void:
@@ -182,10 +211,3 @@ func _move_drop_zone() -> void:
 
 func _move_submit_button() -> void:
 	_submit_button.position = Vector2(_rng.randf_range(920.0, 1010.0), _rng.randf_range(230.0, 520.0))
-
-
-func _difficulty_text() -> String:
-	match difficulty:
-		0: return "Difficulty 1 · upload and submit the correct file"
-		1: return "Difficulty 2 · decoy files + moving drop zone"
-		_: return "Difficulty 3 · less time + moving drop zone + shifting submit"

@@ -58,11 +58,11 @@ The viewport preview and timeline update as properties change. To give duplicate
 | Escape | Pause or resume |
 | R | Restart an independent F6 playtest |
 
-The round starts automatically after the CROSS prompt. Reaching the goal before the timer expires wins. A traffic collision ends the run unless a shield is available. Each restart restores the level's initial variables and pickups. Traffic follows the authored schedule without additional random spawning. In the collection, the host manages retries, score, and lives; R is reserved for independent playtests. All movement and pause bindings come from the shared InputActions API.
+The round starts after the 3.2-second title and instruction intro. Click to skip it. Reaching the goal before the timer expires wins. A traffic collision ends the run unless a shield is available. Each restart restores the level's initial variables and pickups. Traffic follows the authored schedule without additional random spawning. In the collection, the host manages retries, score, and lives; R is reserved for independent playtests. All movement and pause bindings come from the shared InputActions API.
 
 ## Include a level in the collection
 
-Duplicate `scenes/microgames/crossing.tscn`, then set its root's **Level Scene** to your authored `.tscn`. In `scenes/core/default_week.tres`, expand a stage's **Games** and point a round's **Scene Path** to your wrapper scene. Set its **Difficulty** or **Round Seconds Override** as needed. Zero uses the default duration: 14 seconds on easy, 12 on medium, and 10 on hard. Add a separate wrapper for each distinct authored level. Make shared resources unique before editing them independently.
+Duplicate `scenes/microgames/crossing.tscn`, then set its root's **Level Scene** to your authored `.tscn`. In `scenes/core/default_week.tres`, expand a stage's **Games** and point a round's **Scene Path** to your wrapper scene. Set its **Difficulty** or **Round Seconds Override** as needed. Zero uses the standard duration: 9 seconds on easy, 8 on medium, and 7 on hard. Add a separate wrapper for each distinct authored level. Make shared resources unique before editing them independently.
 
 ## Items and extension points
 

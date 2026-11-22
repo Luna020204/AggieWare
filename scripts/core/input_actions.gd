@@ -41,8 +41,32 @@ const DEFAULT_KEYS: Dictionary = {
 }
 
 
+## SCRUM-57 "hold instead of mash": while the setting is on and the mash key
+## is held, is_just_pressed(ACTION_MASH) fires every MASH_HOLD_INTERVAL.
+const MASH_HOLD_INTERVAL := 0.12
+var _mash_hold_clock := 0.0
+var _mash_hold_tick := false
+
+
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_ensure_default_actions()
+
+
+func _process(delta: float) -> void:
+	_mash_hold_tick = false
+	if get_tree().paused or not _mash_hold_enabled() or not Input.is_action_pressed(ACTION_MASH):
+		_mash_hold_clock = 0.0
+		return
+	_mash_hold_clock += delta
+	if _mash_hold_clock >= MASH_HOLD_INTERVAL:
+		_mash_hold_clock = fmod(_mash_hold_clock, MASH_HOLD_INTERVAL)
+		_mash_hold_tick = true
+
+
+func _mash_hold_enabled() -> bool:
+	var state := get_node_or_null("/root/GameState")
+	return state != null and bool(state.call("get_setting", &"mash_hold", false))
 
 
 func _ensure_default_actions() -> void:
@@ -64,6 +88,8 @@ func is_pressed(action_name: StringName) -> bool:
 
 
 func is_just_pressed(action_name: StringName) -> bool:
+	if action_name == ACTION_MASH and _mash_hold_tick and not get_tree().paused and Input.is_action_pressed(ACTION_MASH) and _mash_hold_enabled():
+		return true
 	return Input.is_action_just_pressed(action_name)
 
 
@@ -85,7 +111,11 @@ func action_label(action_name: StringName) -> String:
 	var events := get_action_events(action_name)
 	if events.is_empty():
 		return String(action_name)
-	return events[0].as_text().replace(" (Physical)", "")
+	var event := events[0]
+	if event is InputEventKey:
+		var code: int = event.get_physical_keycode_with_modifiers() if event.physical_keycode != KEY_NONE else event.get_keycode_with_modifiers()
+		return OS.get_keycode_string(code)
+	return event.as_text()
 
 
 ## Hook for SCRUM-57 key remapping. Replacing the events keeps remapping
