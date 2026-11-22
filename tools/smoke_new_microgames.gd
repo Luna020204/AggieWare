@@ -233,8 +233,20 @@ func _microscope() -> void:
 	_assert(decoys[0] < decoys[1] and decoys[1] < decoys[2], "microscope: look-alikes do not increase %s" % [decoys])
 	_assert(radii[0] > radii[1] and radii[1] > radii[2], "microscope: view does not shrink")
 
-	# Real arrow-key input pans the view.
+	# The intro holds the timer and shows the lab building; a click skips it.
 	var game := await _spawn(scene, 1)
+	var full: float = game._seconds_left
+	for i: int in 5:
+		await process_frame
+	_assert(game._seconds_left == full and game._overlay.intro.visible, "microscope: timer ran during the intro")
+	_assert(game._walk_in.scene.visible and game._walk_in.walker.visible, "microscope: intro does not show the building and the student")
+	await _click(Vector2(640.0, 200.0))
+	_assert(game._intro_left == 0.0 and not game._overlay.intro.visible, "microscope: a click did not skip the intro")
+	game.queue_free()
+
+	# Real arrow-key input pans the view.
+	game = await _spawn(scene, 1)
+	game.skip_intro()
 	var results := _watch(game)
 	var start: Vector2 = game.camera
 	Input.action_press(InputActions.ACTION_RIGHT)
@@ -263,12 +275,14 @@ func _microscope() -> void:
 
 	# ACTION on the target wins immediately; timeout fails.
 	game = await _spawn(scene, 2)
+	game.skip_intro()
 	results = _watch(game)
 	game.camera = game._target_pos
 	game.confirm()
 	_assert(results == [true], "microscope: ACTION on target did not win")
 	game.queue_free()
 	game = await _spawn(scene, 0)
+	game.skip_intro()
 	results = _watch(game)
 	game._seconds_left = 0.01
 	for i: int in 5:
