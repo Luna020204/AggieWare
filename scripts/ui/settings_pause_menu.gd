@@ -7,11 +7,15 @@ extends CanvasLayer
 ## the real pause state; this node only presents and edits that state.
 
 signal menu_closed
+const UI := preload("res://scripts/ui/microgame_ui.gd")
 
 var _backdrop: ColorRect
 var _center: CenterContainer
 var _music_toggle: CheckButton
 var _sfx_toggle: CheckButton
+var _pause_hint: Label
+var _resume_button: Button
+var _previous_focus: WeakRef
 # SCRUM-41 accessibility controls.
 var _timer_assist_option: OptionButton
 var _result_cues_toggle: CheckButton
@@ -31,6 +35,7 @@ func _ready() -> void:
 	_build_controls_panel()
 	GameState.paused_changed.connect(_on_paused_changed)
 	GameState.setting_changed.connect(_on_setting_changed)
+	SettingsStore.bindings_changed.connect(_refresh_bindings)
 	_on_paused_changed(GameState.is_paused)
 
 
@@ -55,6 +60,7 @@ func _build_ui() -> void:
 
 	_center = CenterContainer.new()
 	_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	UI.apply_theme(_center)
 	add_child(_center)
 
 	var panel := PanelContainer.new()
@@ -76,12 +82,14 @@ func _build_ui() -> void:
 	var title := Label.new()
 	title.text = "Pause / Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	UI.shadow(title, 28)
 	layout.add_child(title)
 
-	var hint := Label.new()
-	hint.text = "Press Escape to resume"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	layout.add_child(hint)
+	_pause_hint = Label.new()
+	_pause_hint.text = "Press %s to resume" % InputActions.action_label(InputActions.ACTION_PAUSE)
+	_pause_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layout.add_child(_pause_hint)
 
 	layout.add_child(HSeparator.new())
 
@@ -114,19 +122,28 @@ func _build_ui() -> void:
 	reset_button.pressed.connect(_on_reset_pressed)
 	buttons.add_child(reset_button)
 
-	var resume_button := Button.new()
-	resume_button.text = "Resume"
-	resume_button.pressed.connect(close_menu)
-	buttons.add_child(resume_button)
+	_resume_button = Button.new()
+	_resume_button.text = "Resume"
+	_resume_button.pressed.connect(close_menu)
+	buttons.add_child(_resume_button)
 
 
 func _on_paused_changed(paused: bool) -> void:
+	if paused:
+		var focus_owner := get_viewport().gui_get_focus_owner()
+		_previous_focus = weakref(focus_owner) if focus_owner != null else null
 	_backdrop.visible = paused
 	_center.visible = paused
 	_show_controls(false)
 	if paused:
 		_refresh_settings()
+		_resume_button.grab_focus()
 	else:
+		if _previous_focus != null:
+			var focus_owner := _previous_focus.get_ref() as Control
+			if is_instance_valid(focus_owner) and focus_owner.is_visible_in_tree():
+				focus_owner.grab_focus()
+		_previous_focus = null
 		menu_closed.emit()
 
 
@@ -137,11 +154,12 @@ func _on_setting_changed(_setting_name: StringName, _value: Variant) -> void:
 func _refresh_settings() -> void:
 	if not is_instance_valid(_music_toggle):
 		return
-	_music_toggle.button_pressed = GameState.get_setting(&"music_enabled", true)
-	_sfx_toggle.button_pressed = GameState.get_setting(&"sfx_enabled", true)
+	_pause_hint.text = "Press %s to resume" % InputActions.action_label(InputActions.ACTION_PAUSE)
+	_music_toggle.set_pressed_no_signal(GameState.get_setting(&"music_enabled", true))
+	_sfx_toggle.set_pressed_no_signal(GameState.get_setting(&"sfx_enabled", true))
 	_timer_assist_option.select(maxi(Accessibility.TIMER_ASSIST_LEVELS.find(Accessibility.timer_assist()), 0))
-	_result_cues_toggle.button_pressed = Accessibility.result_cues_enabled()
-	_mash_hold_toggle.button_pressed = GameState.get_setting(&"mash_hold", false)
+	_result_cues_toggle.set_pressed_no_signal(Accessibility.result_cues_enabled())
+	_mash_hold_toggle.set_pressed_no_signal(GameState.get_setting(&"mash_hold", false))
 
 
 func _on_music_toggled(enabled: bool) -> void:
@@ -181,7 +199,7 @@ func _build_accessibility_section(layout: VBoxContainer) -> void:
 	assist_row.add_child(_timer_assist_option)
 
 	_result_cues_toggle = CheckButton.new()
-	_result_cues_toggle.text = "Shape + word result cues (not colour only)"
+	_result_cues_toggle.text = "Result symbols and low-time warning"
 	_result_cues_toggle.toggled.connect(_on_result_cues_toggled)
 	layout.add_child(_result_cues_toggle)
 
@@ -197,7 +215,7 @@ func _on_result_cues_toggled(enabled: bool) -> void:
 ## SCRUM-57: key rebinding and alternative input options.
 func _build_controls_panel() -> void:
 	_controls_panel = PanelContainer.new()
-	_controls_panel.custom_minimum_size = Vector2(460.0, 0.0)
+	_controls_panel.custom_minimum_size = Vector2(700.0, 0.0)
 	_controls_panel.visible = false
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#141a2b")
@@ -218,10 +236,15 @@ func _build_controls_panel() -> void:
 	var title := Label.new()
 	title.text = "Controls"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	UI.shadow(title, 28)
 	layout.add_child(title)
 	var hint := Label.new()
 	hint.text = "Click a key, then press the new key. Escape cancels."
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 14)
+	UI.shadow(hint, 14)
 	layout.add_child(hint)
 	layout.add_child(HSeparator.new())
 
@@ -278,9 +301,15 @@ func _show_controls(open: bool) -> void:
 	if open:
 		_controls_status.text = ""
 		_refresh_bindings()
+		var first_button: Button = _bind_buttons[SettingsStore.REBINDABLE[0]]
+		first_button.grab_focus()
+	elif GameState.is_paused:
+		_resume_button.grab_focus()
 
 
 func _refresh_bindings() -> void:
+	if is_instance_valid(_pause_hint):
+		_pause_hint.text = "Press %s to resume" % InputActions.action_label(InputActions.ACTION_PAUSE)
 	for action: StringName in _bind_buttons:
 		var button: Button = _bind_buttons[action]
 		button.text = "Press a key…" if action == _waiting_action else SettingsStore.describe(action)
@@ -293,7 +322,7 @@ func _start_rebind(action: StringName) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _waiting_action == &"" or not (event is InputEventKey) or not event.pressed or event.echo:
+	if not GameState.is_paused or _waiting_action == &"" or not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	get_viewport().set_input_as_handled()
 	if event.physical_keycode == KEY_ESCAPE or event.keycode == KEY_ESCAPE:

@@ -1,30 +1,12 @@
 extends SceneTree
+## Checks every catalog game at every difficulty through the shared lifecycle.
+## godot --headless --path . --script res://tools/check_microgames.gd
 
-## SCRUM-58: runs every microgame in MicrogameCatalog once per difficulty and
-## reports whether its hooks fire. Also smoke-tests the launcher scene.
-##
-## Run with:
-##   godot --headless --path . --script res://tools/check_microgames.gd
-##
-## Per microgame and difficulty it checks:
-##   contract  root Control, round_completed + time_changed signals,
-##             difficulty property, get_round_seconds() > 0
-##   tick      time_changed fires while the round runs
-##   timeout   with no input, round_completed fires exactly once, by about
-##             get_round_seconds() (game time), plus get_intro_seconds() for
-##             microgames that have one. Stay Focused reports a result
-##             from its own rules (missed thoughts), so WIN or FAIL both pass.
-##   win/fail  calling the microgame's _finish_round(true/false, ...) emits
-##             round_completed with the same value. This checks the wiring of
-##             the hook, not that the puzzle is solvable (tools/smoke_flow.gd
-##             plays the real interactions).
-##
-## Prints MICROGAME_CHECK_OK and exits 0 when everything passes.
-
-const TIME_SCALE := 8.0
-const TIMEOUT_GRACE := 1.5
-
+const STEP := 0.05
+const DRIVER = preload("res://tools/microgame_test_driver.gd")
+const NATIVE_DURATIONS := {"scope": [9.0, 7.0, 5.5], "swipe": [9.0, 8.0, 7.0], "awake": [8.0, 7.0, 6.0], "microscope": [10.0, 9.0, 8.0]}
 var _failures := 0
+var _catalog: Script
 
 
 func _initialize() -> void:
@@ -32,68 +14,65 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	_catalog = load("res://scripts/core/microgame_catalog.gd")
+	root.get_node("GameState").set_setting(&"timer_assist", 1.0)
 	print("microgame              diff    contract tick timeout          win  fail")
-	for entry: Dictionary in MicrogameCatalog.ENTRIES:
+	if _catalog.ENTRIES.size() != 9:
+		_failures += 1
+		push_error("Catalog must contain all nine integrated microgames.")
+	for entry: Dictionary in _catalog.ENTRIES:
 		for difficulty: int in 3:
 			await _check_one(entry, difficulty)
 	await _check_launcher()
 	await _check_flow_prompt()
+	Accessibility.end_microgame()
 	Engine.time_scale = 1.0
-	if _failures == 0:
-		print("MICROGAME_CHECK_OK")
-		quit(0)
-	else:
-		print("MICROGAME_CHECK_FAILED (%d problem(s))" % _failures)
-		quit(1)
+	print("MICROGAME_CHECK_OK" if _failures == 0 else "MICROGAME_CHECK_FAILED (%d problems)" % _failures)
+	quit(0 if _failures == 0 else 1)
 
 
 func _check_one(entry: Dictionary, difficulty: int) -> void:
 	var notes: Array[String] = []
-	var microgame := MicrogameCatalog.instantiate(entry, difficulty)
+	var microgame: Variant = _catalog.instantiate(entry, difficulty)
 	if microgame == null:
 		_report(entry, difficulty, "LOAD", "-", "-", "-", "-", ["could not load " + entry["scene"]])
 		return
-	var problems := MicrogameCatalog.contract_problems(microgame)
+	var problems: Array[String] = _catalog.contract_problems(microgame)
 	if not problems.is_empty():
 		microgame.free()
 		_report(entry, difficulty, "FAIL", "-", "-", "-", "-", problems)
 		return
-	var round_seconds: float = microgame.call("get_round_seconds")
+	var round_seconds: float = microgame.get_round_seconds()
 	if round_seconds <= 0.0:
-		notes.append("get_round_seconds() <= 0")
-
-	# Timeout run: no input, scaled game time.
+		notes.append("get_round_seconds() must be positive")
+	if NATIVE_DURATIONS.has(entry["id"]) and not is_equal_approx(round_seconds, NATIVE_DURATIONS[entry["id"]][difficulty]):
+		notes.append("native authored duration changed")
 	var log := {"results": [], "ticks": 0}
 	microgame.round_completed.connect(func(success: bool) -> void: log["results"].append(success))
-	microgame.time_changed.connect(func(_l: float, _r: float) -> void: log["ticks"] += 1)
+	microgame.time_changed.connect(func(_left: float, _total: float) -> void: log["ticks"] += 1)
+	microgame.prompt_seconds = 0.0
 	root.add_child(microgame)
-	Engine.time_scale = TIME_SCALE
-	# Some microgames show an intro before their timer starts.
-	var intro_seconds: float = microgame.call("get_intro_seconds") if microgame.has_method("get_intro_seconds") else 0.0
-	var deadline_ms := Time.get_ticks_msec() + int((intro_seconds + round_seconds + TIMEOUT_GRACE) / TIME_SCALE * 1000.0) + 500
-	while log["results"].is_empty() and Time.get_ticks_msec() < deadline_ms:
-		await process_frame
-	# Keep running a moment to catch a second (duplicate) emission.
-	for i: int in 10:
-		await process_frame
-	Engine.time_scale = 1.0
+	DRIVER.freeze(microgame)
+	# Deterministic active-time updates exercise timeout rules without a wall-clock
+	# deadline or host clock overrides that can interfere with accessibility.
+	for frame: int in int(ceil(round_seconds / STEP)) + 2:
+		if microgame.is_round_finished():
+			break
+		DRIVER.tick(microgame, STEP)
+	for frame: int in 10:
+		DRIVER.tick(microgame, STEP)
+	var tick := "ok" if log["ticks"] > 1 else "NONE"
+	if tick != "ok":
+		notes.append("time_changed did not advance")
+	var results: Array = log["results"]
+	var timeout := "NONE"
+	if results.size() == 1:
+		timeout = "ok (%s)" % ("WIN" if results[0] else "FAIL")
+	else:
+		notes.append("expected one result, received %d" % results.size())
+	root.remove_child(microgame)
 	microgame.queue_free()
 	await process_frame
-
-	var tick := "ok" if log["ticks"] > 0 else "NONE"
-	if log["ticks"] == 0:
-		notes.append("time_changed never fired")
-	var results: Array = log["results"]
-	var timeout := ""
-	if results.is_empty():
-		timeout = "NONE"
-		notes.append("round_completed did not fire within %.1f s" % (intro_seconds + round_seconds + TIMEOUT_GRACE))
-	elif results.size() > 1:
-		timeout = "x%d" % results.size()
-		notes.append("round_completed fired %d times" % results.size())
-	else:
-		timeout = "ok (%s)" % ("WIN" if results[0] else "FAIL")
-
 	var win := await _forced(entry, difficulty, true)
 	var fail := await _forced(entry, difficulty, false)
 	if win != "ok":
@@ -104,104 +83,90 @@ func _check_one(entry: Dictionary, difficulty: int) -> void:
 
 
 func _forced(entry: Dictionary, difficulty: int, success: bool) -> String:
-	var microgame := MicrogameCatalog.instantiate(entry, difficulty)
-	if not microgame.has_method("_finish_round"):
-		microgame.free()
-		return "n/a"
-	var results: Array = []
+	var microgame: Variant = _catalog.instantiate(entry, difficulty)
+	microgame.prompt_seconds = 0.0
+	var results: Array[bool] = []
 	microgame.round_completed.connect(func(value: bool) -> void: results.append(value))
 	root.add_child(microgame)
-	await process_frame
-	microgame.call("_finish_round", success, "check_microgames")
-	await process_frame
+	DRIVER.freeze(microgame)
+	DRIVER.finish(microgame, success, "CHECK RESULT")
+	DRIVER.finish(microgame, not success, "DUPLICATE RESULT")
+	root.remove_child(microgame)
 	microgame.queue_free()
 	await process_frame
 	if results.size() != 1:
 		return "fired %d times" % results.size()
-	if results[0] != success:
-		return "emitted %s" % results[0]
-	return "ok"
+	return "ok" if results[0] == success else "emitted wrong outcome"
 
 
 func _check_launcher() -> void:
 	var launcher: Variant = load("res://scenes/debug/microgame_launcher.tscn").instantiate()
 	root.add_child(launcher)
-	await process_frame
 	var problems: Array[String] = []
-	for index: int in MicrogameCatalog.ENTRIES.size():
+	for index: int in _catalog.ENTRIES.size():
 		launcher.launch(index, 2, 4)
-		await process_frame
-		if not is_instance_valid(launcher._active) or not launcher._running:
-			problems.append("did not start %s" % MicrogameCatalog.ENTRIES[index]["id"])
+		var game: Variant = launcher._active
+		var entry: Dictionary = _catalog.ENTRIES[index]
+		if game == null or not launcher._running:
+			problems.append("did not start %s" % entry["id"])
 			continue
-		if launcher._active.get("difficulty") != 2:
-			problems.append("difficulty not applied to %s" % MicrogameCatalog.ENTRIES[index]["id"])
-		if not is_equal_approx(Engine.time_scale, 1.5):
-			problems.append("speed not applied (%.2f)" % Engine.time_scale)
-		if launcher._menu.visible:
-			problems.append("menu still visible while playing")
-		var entry: Dictionary = MicrogameCatalog.ENTRIES[index]
-		if not entry.has("verb") or not entry.has("icon"):
-			problems.append("%s has no instruction prompt (verb/icon)" % entry["id"])
-		elif not is_instance_valid(launcher._prompt) or launcher._prompt.verb != entry["verb"]:
-			problems.append("prompt not shown for %s" % entry["id"])
-		elif launcher._active.process_mode != Node.PROCESS_MODE_DISABLED:
-			problems.append("%s runs behind its prompt" % entry["id"])
-		else:
-			launcher._prompt.finish()
-			await process_frame
-			if launcher._active.process_mode == Node.PROCESS_MODE_DISABLED:
-				problems.append("%s did not start after its prompt" % entry["id"])
-		launcher._active.call("_finish_round", true, "check")
-		await create_timer(launcher.RESULT_DELAY + 0.3, true, false, true).timeout
-		if launcher._running or not launcher._menu.visible:
-			problems.append("did not return to menu after %s" % MicrogameCatalog.ENTRIES[index]["id"])
-		if not String(launcher.last_result).contains("WIN"):
-			problems.append("result line missing WIN: %s" % launcher.last_result)
+		DRIVER.freeze(game)
+		if game.difficulty != 2 or launcher._menu.visible:
+			problems.append("difficulty/menu configuration failed for " + entry["id"])
+		if game.get_intro_seconds() > 0.0:
+			if not is_equal_approx(Engine.time_scale, 1.0) or game.is_playing():
+				problems.append("introduction did not precede assisted play for " + entry["id"])
+		elif not game.is_playing() or not is_equal_approx(Engine.time_scale, 1.5):
+			problems.append("native game without introduction did not start immediately: " + entry["id"])
+		if game.game_title != str(entry["title"]).to_upper() or game.instruction_text != entry["instruction"]:
+			problems.append("introduction metadata missing for " + entry["id"])
+		game.skip_intro()
+		if not game.can_interact() or not is_equal_approx(Engine.time_scale, 1.5):
+			problems.append("game did not start at selected speed for " + entry["id"])
+		DRIVER.finish(game, true, "CHECK RESULT")
+		DRIVER.tick(game, launcher.RESULT_DELAY + 0.01)
+		if launcher._running or not launcher._menu.visible or not String(launcher.last_result).contains("WIN"):
+			problems.append("did not return with result for " + entry["id"])
 		if not is_equal_approx(Engine.time_scale, 1.0):
-			problems.append("time_scale not reset")
+			problems.append("clock was not restored for " + entry["id"])
+		await process_frame
 	launcher.queue_free()
 	await process_frame
-	if problems.is_empty():
-		print("launcher: ok (launched %d microgames at HARD 1.5x and returned)" % MicrogameCatalog.ENTRIES.size())
-	else:
-		_failures += problems.size()
-		print("launcher: FAIL  " + "; ".join(problems))
+	_report_group("launcher", problems)
 
 
-## SCRUM-39: the real week flow shows the prompt and holds the microgame.
 func _check_flow_prompt() -> void:
 	var flow: Variant = load("res://scenes/core/game_flow.tscn").instantiate()
 	root.add_child(flow)
-	await process_frame
 	var problems: Array[String] = []
-	for stage: int in 4:
-		flow._start_stage(stage)
-		await process_frame
-		var game: Control = flow._active_scene
-		var entry := MicrogameCatalog.find_by_scene(game.scene_file_path)
-		if not is_instance_valid(flow._prompt):
-			problems.append("day %d: no prompt" % (stage + 1))
-			continue
-		if flow._prompt.verb != entry.get("verb", ""):
-			problems.append("day %d: wrong verb %s" % [stage + 1, flow._prompt.verb])
-		if game.process_mode != Node.PROCESS_MODE_DISABLED:
-			problems.append("day %d: microgame runs behind the prompt" % (stage + 1))
-		flow._prompt.finish()
-		await process_frame
-		if game.process_mode == Node.PROCESS_MODE_DISABLED:
-			problems.append("day %d: microgame did not start after the prompt" % (stage + 1))
+	var rounds := 0
+	for stage: int in flow.week_plan.stages.size():
+		for round_index: int in flow.week_plan.stages[stage].games.size():
+			rounds += 1
+			flow._start_round(stage, round_index)
+			var game: Variant = flow._active_scene
+			DRIVER.freeze(game)
+			var initial_time: float = game.get_seconds_left()
+			DRIVER.tick(game, 0.1)
+			if game.is_playing() or not is_equal_approx(initial_time, game.get_seconds_left()):
+				problems.append("day %d round %d: clock runs during introduction" % [stage + 1, round_index + 1])
+			game.skip_intro()
+			if not game.can_interact():
+				problems.append("day %d round %d: intro did not release play" % [stage + 1, round_index + 1])
+	if rounds != 6:
+		problems.append("the default week no longer has its six rounds")
 	flow.queue_free()
 	await process_frame
-	if problems.is_empty():
-		print("flow prompts: ok (4 days show verb + icon, then start)")
-	else:
-		_failures += problems.size()
-		print("flow prompts: FAIL  " + "; ".join(problems))
+	_report_group("week introductions", problems)
+
+
+func _report_group(label: String, problems: Array[String]) -> void:
+	_failures += problems.size()
+	print(label + ": ok" if problems.is_empty() else label + ": FAIL " + "; ".join(problems))
 
 
 func _report(entry: Dictionary, difficulty: int, contract: String, tick: String, timeout: String, win: String, fail: String, notes: Array[String]) -> void:
-	print("%-22s %-7s %-8s %-4s %-16s %-4s %-4s" % [entry["id"], MicrogameCatalog.DIFFICULTY_NAMES[difficulty], contract, tick, timeout, win, fail])
+	print("%-22s %-7s %-8s %-4s %-16s %-4s %-4s" % [entry["id"], _catalog.DIFFICULTY_NAMES[difficulty], contract, tick, timeout, win, fail])
 	for note: String in notes:
 		print("    ! " + note)
 	_failures += notes.size()

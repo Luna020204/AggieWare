@@ -12,6 +12,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	create_timer(25.0, true, false, true).timeout.connect(func() -> void: quit(1))
 	await _swipe_card()
 	await _stay_awake()
 	await _microscope()
@@ -68,7 +69,7 @@ func _swipe_card() -> void:
 
 	# A real mouse press on the visible top of a card pulls it out; releasing
 	# early puts it back. The pocket hides the rest of the card and blocks clicks.
-	game = await _spawn(scene, 2)
+	game = await _spawn(scene, 2, true)
 	# During the intro the shop scene covers the counter; a click skips the
 	# intro instead of pulling a card.
 	_assert(game._exterior.visible and game._walker.visible, "swipe: intro does not show the shop and the student")
@@ -92,20 +93,17 @@ func _swipe_card() -> void:
 	game.queue_free()
 
 	# The timer waits for the intro; HARD moves the scanner; timeout fails.
-	game = await _spawn(scene, 2)
+	game = await _spawn(scene, 2, true)
 	results = _watch(game)
 	var full: float = game._seconds_left
-	for i: int in 5:
-		await process_frame
-	_assert(game._seconds_left == full and game._intro.visible, "swipe: timer ran during the intro")
+	game._process(0.1)
+	_assert(game._seconds_left == full and game._exterior.visible, "swipe: timer ran during the intro")
 	game.skip_intro()
 	var start_y: float = game._scanner.position.y
-	for i: int in 20:
-		await process_frame
+	game._process(0.25)
 	_assert(game._scanner.position.y != start_y, "swipe: HARD scanner does not move")
 	game._seconds_left = 0.01
-	for i: int in 5:
-		await process_frame
+	game._process(0.02)
 	_assert(results == [false], "swipe: timeout did not fail once: %s" % [results])
 	game.queue_free()
 
@@ -152,11 +150,10 @@ func _stay_awake() -> void:
 	_assert(speeds[0] < speeds[1] and speeds[1] < speeds[2], "awake: Z's do not get faster")
 	_assert(sizes[0] > sizes[1] and sizes[1] > sizes[2], "awake: Z's do not get smaller %s" % [sizes])
 
-	# The intro holds the timer; a click skips it.
-	var game := await _spawn(scene, 1)
+	# Preserve the lecture-hall walk-in and click-to-skip behavior.
+	var game := await _spawn(scene, 1, true)
 	var full: float = game._seconds_left
-	for i: int in 5:
-		await process_frame
+	game._process(0.1)
 	_assert(game._seconds_left == full and game._overlay.intro.visible, "awake: timer ran during the intro")
 	_assert(game._walk_in.scene.visible and game._walk_in.walker.visible, "awake: intro does not show the building and the student")
 	await _click(Vector2(640.0, 200.0))
@@ -165,7 +162,6 @@ func _stay_awake() -> void:
 
 	# Real clicks pop Z's; surviving to the bell wins once.
 	game = await _spawn(scene, 1)
-	game.skip_intro()
 	var results := _watch(game)
 	game._spawn_clock = -100.0  # no random spawns during this check
 	var z1: Button = game.spawn_z(Vector2(200.0, 250.0))
@@ -174,19 +170,16 @@ func _stay_awake() -> void:
 	await _click(z2.get_global_rect().get_center())
 	_assert(game._popped == 2 and game._zs.is_empty(), "awake: real clicks did not pop both Z's (%d)" % game._popped)
 	game._seconds_left = 0.01
-	for i: int in 5:
-		await process_frame
+	game._process(0.02)
 	_assert(results == [true], "awake: surviving did not win: %s" % [results])
 	game.queue_free()
 
 	# A Z that reaches the student fails the round exactly once.
 	game = await _spawn(scene, 0)
-	game.skip_intro()
 	results = _watch(game)
 	game._spawn_clock = -100.0
 	var near: Button = game.spawn_z(game.STUDENT_CENTER - Vector2(30.0, 30.0))
-	for i: int in 5:
-		await process_frame
+	game._process(0.02)
 	_assert(results == [false], "awake: Z reaching the student did not fail: %s" % [results])
 	game.pop_z(near)
 	_assert(game._popped == 0, "awake: popped a Z after the round ended")
@@ -194,11 +187,10 @@ func _stay_awake() -> void:
 
 	# Untouched, Z's spawn by themselves and the round fails before the bell.
 	game = await _spawn(scene, 2)
-	game.skip_intro()
 	results = _watch(game)
 	var frames := 0
-	while results.is_empty() and frames < 2000:
-		await process_frame
+	while results.is_empty() and frames < 1000:
+		game._process(0.02)
 		frames += 1
 	_assert(results == [false], "awake: idle round did not end in a fail: %s" % [results])
 	game.queue_free()
@@ -234,10 +226,9 @@ func _microscope() -> void:
 	_assert(radii[0] > radii[1] and radii[1] > radii[2], "microscope: view does not shrink")
 
 	# The intro holds the timer and shows the lab building; a click skips it.
-	var game := await _spawn(scene, 1)
+	var game := await _spawn(scene, 1, true)
 	var full: float = game._seconds_left
-	for i: int in 5:
-		await process_frame
+	game._process(0.1)
 	_assert(game._seconds_left == full and game._overlay.intro.visible, "microscope: timer ran during the intro")
 	_assert(game._walk_in.scene.visible and game._walk_in.walker.visible, "microscope: intro does not show the building and the student")
 	await _click(Vector2(640.0, 200.0))
@@ -249,12 +240,12 @@ func _microscope() -> void:
 	game.skip_intro()
 	var results := _watch(game)
 	var start: Vector2 = game.camera
-	Input.action_press(InputActions.ACTION_RIGHT)
-	Input.action_press(InputActions.ACTION_DOWN)
-	for i: int in 10:
-		await process_frame
-	Input.action_release(InputActions.ACTION_RIGHT)
-	Input.action_release(InputActions.ACTION_DOWN)
+	var actions: Node = root.get_node("InputActions")
+	Input.action_press(actions.ACTION_RIGHT)
+	Input.action_press(actions.ACTION_DOWN)
+	game._process(0.1)
+	Input.action_release(actions.ACTION_RIGHT)
+	Input.action_release(actions.ACTION_DOWN)
 	_assert(game.camera.x > start.x and game.camera.y > start.y, "microscope: arrow keys did not pan (%s -> %s)" % [start, game.camera])
 	# ACTION away from the target does nothing; panning onto it and holding wins once.
 	game.confirm()
@@ -266,7 +257,7 @@ func _microscope() -> void:
 	_assert(game.is_target_in_crosshair(), "microscope: could not reach the target")
 	var frames := 0
 	while results.is_empty() and frames < 200:
-		await process_frame
+		game._process(0.02)
 		frames += 1
 	_assert(results == [true], "microscope: holding the target did not win: %s" % [results])
 	game.confirm()
@@ -285,15 +276,14 @@ func _microscope() -> void:
 	game.skip_intro()
 	results = _watch(game)
 	game._seconds_left = 0.01
-	for i: int in 5:
-		await process_frame
+	game._process(0.02)
 	_assert(results == [false], "microscope: timeout did not fail: %s" % [results])
 	game.queue_free()
 
 
 # --- helpers -------------------------------------------------------------------
 
-func _spawn(scene: String, difficulty: int) -> Control:
+func _spawn(scene: String, difficulty: int, with_intro := false) -> Control:
 	var game: Control = load(scene).instantiate()
 	var pause := game.get_node_or_null("SettingsPauseMenu")
 	if pause != null:
@@ -301,6 +291,9 @@ func _spawn(scene: String, difficulty: int) -> Control:
 		pause.free()
 	game.set("difficulty", difficulty)
 	root.add_child(game)
+	game.set_process(false)
+	if not with_intro and game.has_method("skip_intro"):
+		game.skip_intro()
 	await process_frame
 	return game
 

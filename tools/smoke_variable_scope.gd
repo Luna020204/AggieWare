@@ -13,6 +13,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	create_timer(25.0, true, false, true).timeout.connect(func() -> void: quit(1))
 	# Difficulty scaling: less time, more choices, look-alikes on HARD.
 	var durations: Array[float] = []
 	for difficulty: int in 3:
@@ -43,6 +44,7 @@ func _run() -> void:
 			game.queue_free()
 		if difficulty == 2:
 			_assert(hard_lookalike_seen == 40, "HARD missing the case look-alike in %d/40 rounds" % (40 - hard_lookalike_seen))
+	_assert(durations == [9.0, 7.0, 5.5], "Scope preserves native difficulty durations")
 	_assert(durations[0] > durations[1] and durations[1] > durations[2], "time does not shrink with difficulty: %s" % [durations])
 	_assert(durations[0] <= 10.0 and durations[2] >= 5.0, "durations outside 5-10 s: %s" % [durations])
 
@@ -116,8 +118,8 @@ func _run() -> void:
 	results = []
 	game.round_completed.connect(func(s: bool) -> void: results.append(s))
 	game._seconds_left = 0.05
-	for i: int in 10:
-		await process_frame
+	game._process(0.1)
+	game._process(0.1)
 	_assert(results == [false], "timeout did not fail exactly once: %s" % [results])
 	game.queue_free()
 
@@ -130,6 +132,7 @@ func _spawn(difficulty: int, skip_intro: bool = true) -> Control:
 	var game: Control = load(SCENE).instantiate()
 	game.set("difficulty", difficulty)
 	root.add_child(game)
+	game.set_process(false)
 	await process_frame
 	if skip_intro:
 		game.skip_intro()

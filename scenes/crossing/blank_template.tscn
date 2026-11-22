@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://addons/aggie_crossing/campus_level.gd" id="1_dxxps"]
+[ext_resource type="Script" path="res://addons/aggie_crossing/level_piece.gd" id="2_tveur"]
+
+[node name="CampusLevel" type="Node2D" unique_id=1411645246]
+script = ExtResource("1_dxxps")
+level_name = "00 - Blank Template"
+allow_horizontal = true
+ground_rows = PackedStringArray("path", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "path")
+
+[node name="Start" type="Node2D" parent="." unique_id=2101584488]
+position = Vector2(400, 560)
+script = ExtResource("2_tveur")
+kind = "start"
+
+[node name="Goal" type="Node2D" parent="." unique_id=1451734833]
+position = Vector2(400, 0)
+script = ExtResource("2_tveur")
+kind = "goal"

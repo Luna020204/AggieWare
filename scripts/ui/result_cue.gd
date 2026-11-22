@@ -1,47 +1,42 @@
 class_name ResultCue
 extends Control
-
-## SCRUM-41: colour-independent round result banner.
-##
-## A filled circle with a check and the word CLEAR, or a hollow square with a
-## cross and the word MISS. Shape, symbol and word all differ, so it reads
-## the same with any colour vision or in greyscale. Shown by the week flow
-## and the launcher when Accessibility.result_cues_enabled() is on.
-
+## Unboxed centered feedback; its owner advances the fade and round boundary.
+const UI = preload("res://scripts/ui/microgame_ui.gd")
 var success := true
-
-
-static func create(was_success: bool) -> ResultCue:
-	var cue := ResultCue.new()
-	cue.success = was_success
-	return cue
-
+var word_label: Label
+var message_label: Label
+var shade: ColorRect
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	process_mode = Node.PROCESS_MODE_ALWAYS
-	queue_redraw()
+	UI.apply_theme(self)
+	shade = ColorRect.new()
+	shade.color = Color(0, 0, 0, 0.55)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
+	word_label = UI.label(self, "", Vector2(80, 240), 28, UI.TEXT, Vector2(1120, 45))
+	word_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label = UI.label(self, "", Vector2(80, 300), 42, UI.TEXT, Vector2(1120, 140))
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hide()
 
+func present(message: String, color: Color, size_px: int = 42, final_result: bool = true, was_success: bool = false) -> void:
+	success = was_success
+	message_label.text = message
+	message_label.add_theme_font_size_override("font_size", size_px)
+	message_label.add_theme_color_override("font_color", color)
+	UI.shadow(message_label, size_px)
+	word_label.text = ("● ✓ CLEAR" if success else "□ ✗ MISS") if final_result and Accessibility.result_cues_enabled() else ""
+	modulate.a = 1.0
+	show()
+
+func set_remaining(remaining: float, duration: float) -> void:
+	modulate.a = clampf(remaining / maxf(minf(0.4, duration), 0.001), 0.0, 1.0)
+	visible = remaining > 0.0
 
 func get_word() -> String:
 	return "CLEAR" if success else "MISS"
-
-
-func _draw() -> void:
-	var center := Vector2(640.0, 330.0)
-	var panel := Rect2(center - Vector2(250.0, 110.0), Vector2(500.0, 220.0))
-	draw_rect(panel, Color(0.04, 0.05, 0.1, 0.88))
-	draw_rect(panel, Color("#f5f7ff"), false, 4.0)
-	var icon := center + Vector2(-140.0, 0.0)
-	var ink := Color("#f5f7ff")
-	if success:
-		draw_circle(icon, 62.0, Color("#2f7d57"))
-		draw_arc(icon, 62.0, 0.0, TAU, 48, ink, 5.0)
-		draw_polyline(PackedVector2Array([icon + Vector2(-30.0, 2.0), icon + Vector2(-8.0, 26.0), icon + Vector2(32.0, -24.0)]), ink, 10.0)
-	else:
-		var square := Rect2(icon - Vector2(58.0, 58.0), Vector2(116.0, 116.0))
-		draw_rect(square, ink, false, 6.0)
-		draw_line(icon + Vector2(-30.0, -30.0), icon + Vector2(30.0, 30.0), ink, 10.0)
-		draw_line(icon + Vector2(30.0, -30.0), icon + Vector2(-30.0, 30.0), ink, 10.0)
-	draw_string(get_theme_default_font(), center + Vector2(-50.0, 26.0), get_word(), HORIZONTAL_ALIGNMENT_LEFT, -1, 72, ink)

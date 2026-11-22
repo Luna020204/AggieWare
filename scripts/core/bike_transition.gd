@@ -8,12 +8,15 @@ extends Control
 
 signal transition_finished(next_scene_path: String)
 
+const UI := preload("res://scripts/ui/microgame_ui.gd")
+
 @export var next_prompt: String = "CANVAS"
 @export_range(1.0, 10.0, 0.5) var transition_duration: float = 3.0
 @export var auto_advance: bool = true
 @export_file("*.tscn") var next_scene_path: String = ""
 @export_range(0, 9, 1) var lives: int = 3
 @export var score: int = 0
+@export var managed_by_flow := false
 
 var _elapsed := 0.0
 var _current_lane := 1
@@ -30,27 +33,38 @@ const LANE_Y := [245.0, 350.0, 455.0]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
+	UI.apply_theme(self)
 	_build_ui()
+	if not managed_by_flow:
+		var pause_scene: PackedScene = load("res://scenes/ui/settings_pause_menu.tscn")
+		add_child(pause_scene.instantiate())
 	_reset_transition()
 
 
 func _process(delta: float) -> void:
-	if _finished:
+	if _finished or not is_inside_tree() or get_tree().paused:
 		return
-
-	if InputActions.is_just_pressed(InputActions.ACTION_UP):
-		_set_lane(_current_lane - 1)
-	if InputActions.is_just_pressed(InputActions.ACTION_DOWN):
-		_set_lane(_current_lane + 1)
-	if InputActions.is_just_pressed(InputActions.ACTION_CONFIRM):
-		_finish_transition()
-
-	_elapsed += delta
-	var fraction := clampf(_elapsed / transition_duration, 0.0, 1.0)
+	_elapsed += maxf(delta, 0.0)
+	var fraction := clampf(_elapsed / maxf(transition_duration, 0.001), 0.0, 1.0)
 	_progress.value = fraction * 100.0
 	_bike.position.x = TRACK_RECT.position.x + 34.0 + fraction * (TRACK_RECT.size.x - 110.0)
 	if auto_advance and _elapsed >= transition_duration:
 		_finish_transition()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if _finished or get_tree().paused or (event is InputEventKey and event.echo):
+		return
+	var viewport := get_viewport()
+	if event.is_action_pressed(InputActions.ACTION_UP):
+		_set_lane(_current_lane - 1)
+	elif event.is_action_pressed(InputActions.ACTION_DOWN):
+		_set_lane(_current_lane + 1)
+	elif event.is_action_pressed(InputActions.ACTION_CONFIRM):
+		_finish_transition()
+	else:
+		return
+	viewport.set_input_as_handled()
 
 
 func _build_ui() -> void:
@@ -69,17 +83,20 @@ func _build_ui() -> void:
 
 	var title := Label.new()
 	title.text = "BIKE TO NEXT CLASS"
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", 28)
+	UI.shadow(title, 28)
 	title.add_theme_color_override("font_color", Color("#f5f7ff"))
 	header.add_child(title)
 
 	_lives_label = Label.new()
-	_lives_label.add_theme_font_size_override("font_size", 20)
+	_lives_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_lives_label, 21)
 	_lives_label.add_theme_color_override("font_color", Color("#ff9e9e"))
 	header.add_child(_lives_label)
 
 	_score_label = Label.new()
-	_score_label.add_theme_font_size_override("font_size", 20)
+	_score_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_score_label, 21)
 	_score_label.add_theme_color_override("font_color", Color("#ffd166"))
 	header.add_child(_score_label)
 
@@ -89,6 +106,7 @@ func _build_ui() -> void:
 	next_label.text = "NEXT UP:  " + next_prompt
 	next_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	next_label.add_theme_font_size_override("font_size", 28)
+	UI.shadow(next_label, 28)
 	next_label.add_theme_color_override("font_color", Color("#73b7ff"))
 	add_child(next_label)
 
@@ -128,7 +146,8 @@ func _build_ui() -> void:
 	_status_label.position = Vector2(0.0, 600.0)
 	_status_label.size = Vector2(1280.0, 42.0)
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label.add_theme_font_size_override("font_size", 18)
+	_status_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_status_label, 21)
 	_status_label.add_theme_color_override("font_color", Color("#b8c7e6"))
 	add_child(_status_label)
 
@@ -140,8 +159,8 @@ func _reset_transition() -> void:
 	_progress.value = 0.0
 	_lives_label.text = "Lives: %d" % lives
 	_score_label.text = "Score: %d" % score
-	_status_label.text = "Use Up / Down to choose your lane · Confirm to skip"
 	_set_lane(_current_lane)
+	_status_label.text = "Use Up / Down to choose your lane · Confirm to skip"
 
 
 func _set_lane(lane: int) -> void:
@@ -157,7 +176,7 @@ func _finish_transition() -> void:
 	_progress.value = 100.0
 	_status_label.text = "Arrived — loading %s" % next_prompt
 	transition_finished.emit(next_scene_path)
-	if next_scene_path != "" and ResourceLoader.exists(next_scene_path):
+	if not managed_by_flow and is_inside_tree() and next_scene_path != "" and ResourceLoader.exists(next_scene_path):
 		get_tree().change_scene_to_file.call_deferred(next_scene_path)
 
 

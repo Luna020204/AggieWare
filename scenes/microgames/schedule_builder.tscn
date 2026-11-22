@@ -10,3 +10,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_schedule")
+prompt = "REGISTER"
+game_title = "SCHEDULE BUILDER"
+instruction_text = "WAIT FOR 8:00, THEN REGISTER."
