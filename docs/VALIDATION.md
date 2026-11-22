@@ -10,7 +10,7 @@ Review environment: **Windows, Godot 4.7.2.stable.official.ed1daf0bf**, November
 | Actual viewport input, `tools/test_input_routes.gd` | 28 checks, 0 failures |
 | Framework presentation and native preservation, `tools/test_presentation.gd` | 914 checks, 0 failures |
 | Flow smoke subset, `tools/smoke_flow.gd` | 100 checks, 0 failures |
-| PR16 native source/assets SHA-256 comparison | All 68 manifest files match `5412665` byte-for-byte |
+| Native source/assets SHA-256 comparison | All manifest files match the latest reviewed native revision (see `tools/fixtures/pr16_native_sha256.json`; PR #17 `f4b2ac5` added the Microscope art) |
 | Editor import, catalog contract and launcher | Passed; `MICROGAME_CHECK_OK` |
 | Scope, Swipe/Awake/Microscope rules | Both native-rule smoke suites passed |
 | Accessibility, key remapping and saved settings | `ACCESSIBILITY_SMOKE_OK` |
@@ -83,3 +83,7 @@ The equivalent shell entry point is `tools/build_web.sh` with `GODOT` selecting 
 The export used the official Godot 4.7.2 Web templates and produced HTML, JavaScript, PCK, WASM and supporting assets in `build/web/`, packaged as `build/aggieware-web.zip`. Documentation, test tools and review captures are excluded from the game export. Nothing was published to itch.io.
 
 Automated tests and captures do not establish human difficulty balance, full accessibility usability, browser interaction, or macOS/Linux runtime behavior. CI rebuilds from the submitted revision independently.
+
+## Update for PR #17 (Microscope pixel art)
+
+PR #17 redraws Microscope with a lab walk-in. The preservation manifest now records revision `f4b2ac5` (89 files, adding the Microscope art and its generator), and `tools/test_presentation.gd` / `tools/test_collection.gd` treat Microscope as a walk-in game. When a native game is redesigned, regenerate the manifest and update `NATIVE_REVISION`, `NATIVE_FILE_COUNT` and `WALK_IN_IDS` in `tools/test_presentation.gd`.

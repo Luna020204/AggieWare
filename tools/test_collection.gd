@@ -320,7 +320,7 @@ func _test_native_host_lifecycle() -> void:
 		flow._hud._process(0.0)
 		_check(not flow._hud.visible and native.show_internal_timer, kind + " retains its native timer without a duplicate host timer")
 		var full: float = session.get_round_seconds()
-		var has_intro := kind in ["swipe_card", "stay_awake"]
+		var has_intro := kind in ["swipe_card", "stay_awake", "microscope"]
 		_check(is_equal_approx(session.get_intro_seconds(), 3.2 if has_intro else 0.0) and session.is_playing() != has_intro, kind + " retains its authored intro policy")
 		DRIVER.skip_intro(session)
 		_tick_game(session, 0.1)
