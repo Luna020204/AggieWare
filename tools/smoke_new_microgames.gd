@@ -226,10 +226,9 @@ func _microscope() -> void:
 	_assert(radii[0] > radii[1] and radii[1] > radii[2], "microscope: view does not shrink")
 
 	# The intro holds the timer and shows the lab building; a click skips it.
-	var game := await _spawn(scene, 1)
+	var game := await _spawn(scene, 1, true)
 	var full: float = game._seconds_left
-	for i: int in 5:
-		await process_frame
+	game._process(0.1)
 	_assert(game._seconds_left == full and game._overlay.intro.visible, "microscope: timer ran during the intro")
 	_assert(game._walk_in.scene.visible and game._walk_in.walker.visible, "microscope: intro does not show the building and the student")
 	await _click(Vector2(640.0, 200.0))

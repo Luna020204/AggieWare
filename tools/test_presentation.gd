@@ -30,14 +30,21 @@ func _run() -> void:
 		print("PRESENTATION_TESTS_OK")
 	quit(1 if failures else 0)
 
+## Luna's native games: latest reviewed revision of the preserved files and
+## the games that open with a walk-in intro. Update both when a native game
+## is redesigned (PR #17 added the Microscope lab walk-in).
+const NATIVE_REVISION := "f4b2ac5"
+const NATIVE_FILE_COUNT := 89
+const WALK_IN_IDS: Array[String] = ["swipe", "awake", "microscope"]
+
 func _test_native_preservation() -> void:
 	var path := "res://tools/fixtures/pr16_native_sha256.json"
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not _check(manifest is Dictionary and manifest.get("revision") == "5412665", "Native preservation manifest identifies the reviewed PR16 revision"):
+	if not _check(manifest is Dictionary and manifest.get("revision") == NATIVE_REVISION, "Native preservation manifest identifies the reviewed native revision"):
 		return
-	_check(manifest.files.size() == 68, "Native preservation covers all four games, scenes, helpers, art, and generators")
+	_check(manifest.files.size() == NATIVE_FILE_COUNT, "Native preservation covers all four games, scenes, helpers, art, and generators")
 	for source: String in manifest.files:
-		_check(FileAccess.get_sha256("res://" + source) == manifest.files[source], "PR16 bytes preserved: " + source)
+		_check(FileAccess.get_sha256("res://" + source) == manifest.files[source], "Native bytes preserved: " + source)
 
 func _test_native_format(entry: Dictionary, difficulty: int) -> void:
 	var session: Variant = Catalog.instantiate(entry, difficulty)
@@ -47,7 +54,7 @@ func _test_native_format(entry: Dictionary, difficulty: int) -> void:
 	DRIVER.freeze(session)
 	var game: Variant = session.native_game
 	var label := "%s native difficulty %d" % [entry.id, difficulty]
-	var walk_in: bool = entry.id in ["swipe", "awake"]
+	var walk_in: bool = entry.id in WALK_IN_IDS
 	var full: float = NATIVE_DURATIONS[entry.id][difficulty]
 	_check(is_equal_approx(session.get_round_seconds(), full), label + " preserves its original difficulty duration")
 	_check(session.uses_native_hud() and game.show_internal_timer and game._timer_label.is_visible_in_tree(), label + " retains its own timer")
