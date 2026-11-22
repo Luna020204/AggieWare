@@ -2,7 +2,7 @@ extends "res://scripts/core/microgame_base.gd"
 
 ## Move a blue shield to intercept distracting thoughts until the exam ends.
 const UI := preload("res://scripts/ui/microgame_ui.gd")
-const DURATIONS: Array[float] = [10.0, 9.0, 8.0]
+const DURATIONS: Array[float] = [9.0, 8.0, 7.0]
 const SPAWN_INTERVALS: Array[float] = [1.3, 0.95, 0.7]
 const END_INTERVAL_RATIO := 0.65
 const SPEEDS: Array[float] = [210.0, 275.0, 335.0]

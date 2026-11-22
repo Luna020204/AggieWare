@@ -249,7 +249,7 @@ func _test_focus_ramp() -> void:
 				game._remove_thought(thought)
 		_check(spawns[2] > spawns[0], "Focus difficulty %d spawns more thoughts in the last third (%d) than the first (%d)" % [difficulty, spawns[2], spawns[0]])
 		_tick_game(game, 0.01)
-		_check(game._ended and game._missed == 0, "Focus difficulty %d completes after its longer round without artificial misses" % difficulty)
+		_check(game._ended and game._missed == 0, "Focus difficulty %d completes at its standard duration without artificial misses" % difficulty)
 		await _dispose(game)
 
 func _test_week_flow() -> void:
