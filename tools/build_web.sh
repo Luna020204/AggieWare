@@ -13,6 +13,17 @@ run_godot() {
   shift 2
   echo "Running $name"
   "$GODOT" "$@" >"build/logs/$name.log" 2>&1 || status=$?
+  # Godot 4.7's dummy renderer can emit this lone, nonfatal import race.
+  # https://github.com/godotengine/godot/issues/124139
+  if [[ "$name" == import ]] && (( status == 0 )); then
+    local import_errors
+    import_errors="$(grep -E '^[[:space:]]*(SCRIPT ERROR|ERROR|Parse Error):' "build/logs/$name.log" || true)"
+    if [[ "$import_errors" == 'ERROR: Parameter "t" is null.' ]]; then
+      mv "build/logs/$name.log" build/logs/import-first.log
+      echo 'Retrying import after Godot headless texture race'
+      "$GODOT" "$@" >"build/logs/$name.log" 2>&1 || status=$?
+    fi
+  fi
   if (( status != 0 )) || grep -Eq '^[[:space:]]*(SCRIPT ERROR|ERROR|Parse Error):' "build/logs/$name.log"; then
     cat "build/logs/$name.log"
     echo "Godot check failed: $name (exit $status)."

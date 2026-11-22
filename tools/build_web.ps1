@@ -19,6 +19,19 @@ function Invoke-GodotCheck([string]$Name, [string[]]$Arguments, [string]$Marker 
     $output = & $Godot @Arguments 2>&1 | Out-String
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = $savedPreference
+    # Godot 4.7's dummy renderer can emit this lone, nonfatal import race.
+    # https://github.com/godotengine/godot/issues/124139
+    if ($Name -eq 'import' -and $exitCode -eq 0) {
+        $importErrors = [regex]::Matches($output, '(?m)^\s*(?:SCRIPT ERROR|ERROR|Parse Error):[^\r\n]*')
+        if ($importErrors.Count -eq 1 -and $importErrors[0].Value.Trim() -eq 'ERROR: Parameter "t" is null.') {
+            $output | Set-Content -LiteralPath (Join-Path $logDirectory 'import-first.log') -Encoding utf8
+            Write-Host 'Retrying import after Godot headless texture race'
+            $ErrorActionPreference = 'Continue'
+            $output = & $Godot @Arguments 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
+            $ErrorActionPreference = $savedPreference
+        }
+    }
     $output | Set-Content -LiteralPath (Join-Path $logDirectory "$Name.log") -Encoding utf8
     if ($exitCode -ne 0 -or $output -match '(?m)^\s*(SCRIPT ERROR|ERROR|Parse Error):' -or ($Marker -and $output -notmatch $Marker)) {
         Write-Host $output
