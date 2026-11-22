@@ -87,3 +87,7 @@ Automated tests and captures do not establish human difficulty balance, full acc
 ## Update for PR #17 (Microscope pixel art)
 
 PR #17 redraws Microscope with a lab walk-in. The preservation manifest now records revision `f4b2ac5` (89 files, adding the Microscope art and its generator), and `tools/test_presentation.gd` / `tools/test_collection.gd` treat Microscope as a walk-in game. When a native game is redesigned, regenerate the manifest and update `NATIVE_REVISION`, `NATIVE_FILE_COUNT` and `WALK_IN_IDS` in `tools/test_presentation.gd`.
+
+## Update for PR #18 (Variable Not in Scope pixel art)
+
+PR #18 redraws Variable Not in Scope on a laptop with a walk-in and the case-preserving AggieMono font. The manifest now records revision `5610ac7` (97 files, adding the Scope art, AggieMono and both generators). Scope runs the walk-in checks, and the font checks expect AggieMono instead of a SystemFont.

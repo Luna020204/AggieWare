@@ -216,7 +216,7 @@ func _check_native_theme(session: Variant, scene_path: String, game_id: String) 
 	else:
 		_assert(session.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR, game_id + ": wrapper isolates the host's nearest filter")
 	if game_id == "scope":
-		_assert(hosted._choice_buttons[0].get_theme_font("font") is SystemFont, "scope: authored case-sensitive choice font remains a SystemFont")
+		_assert(hosted._choice_buttons[0].get_theme_font("font").resource_path == "res://assets/fonts/aggie_mono.fnt", "scope: authored case-sensitive choice font (AggieMono) is kept")
 	root.remove_child(original)
 	original.free()
 
