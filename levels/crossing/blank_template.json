@@ -1,0 +1,46 @@
+{
+	"goal": [
+		10,
+		0
+	],
+	"grid": {
+		"cell_size": 40,
+		"columns": 21,
+		"rows": 15
+	},
+	"items": [],
+	"lanes": [],
+	"metadata": {},
+	"name": "00 - Blank Template",
+	"obstacles": [],
+	"rules": {
+		"allow_horizontal": true,
+		"player_speed": 150.0
+	},
+	"schema_version": 1,
+	"start": [
+		10,
+		14
+	],
+	"terrain": [
+		"path",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"grass",
+		"path"
+	],
+	"variables": {
+		"shields": 0,
+		"tokens": 0
+	}
+}

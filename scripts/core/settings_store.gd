@@ -12,10 +12,12 @@ signal bindings_changed
 const REBINDABLE: Array[StringName] = [
 	&"game_up", &"game_down", &"game_left", &"game_right",
 	&"game_confirm", &"game_type", &"game_mash",
+	&"game_retry",
 ]
 const ACTION_LABELS: Dictionary = {
 	&"game_up": "Up", &"game_down": "Down", &"game_left": "Left", &"game_right": "Right",
 	&"game_confirm": "Action / confirm", &"game_type": "Type", &"game_mash": "Mash",
+	&"game_retry": "Retry standalone game",
 }
 
 var path := "user://settings.cfg"
@@ -25,7 +27,7 @@ var _loading := false
 func _ready() -> void:
 	# Headless --script tools (smoke tests, CI) must not read or overwrite the
 	# player's real settings; tests that need a file set `path` themselves.
-	if OS.get_cmdline_args().has("--script"):
+	if OS.get_cmdline_args().has("--script") or OS.get_cmdline_args().has("-s"):
 		path = ""
 	load_settings()
 	GameState.setting_changed.connect(func(_name: StringName, _value: Variant) -> void: save_settings())
@@ -33,8 +35,12 @@ func _ready() -> void:
 
 ## Replaces the keyboard binding of `action` with `event` and saves.
 func rebind(action: StringName, event: InputEventKey) -> void:
+	if not REBINDABLE.has(action):
+		return
 	var key := InputEventKey.new()
 	key.physical_keycode = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+	if key.physical_keycode == KEY_NONE or key.physical_keycode == KEY_ESCAPE:
+		return
 	var events: Array[InputEvent] = [key]
 	InputActions.replace_action_events(action, events)
 	bindings_changed.emit()
@@ -66,8 +72,11 @@ func conflicts(action: StringName, event: InputEventKey) -> Array[String]:
 		if other == action:
 			continue
 		for existing: InputEvent in InputActions.get_action_events(other):
-			if existing is InputEventKey and existing.physical_keycode == code:
-				found.append(ACTION_LABELS[other])
+			if existing is InputEventKey:
+				var existing_code: int = existing.physical_keycode if existing.physical_keycode != KEY_NONE else existing.keycode
+				if existing_code == code:
+					found.append(ACTION_LABELS[other])
+					break
 	return found
 
 
@@ -81,7 +90,7 @@ func save_settings() -> void:
 		var codes: Array[int] = []
 		for event: InputEvent in InputActions.get_action_events(action):
 			if event is InputEventKey:
-				codes.append(event.physical_keycode)
+				codes.append(event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode)
 		config.set_value("bindings", String(action), codes)
 	var error := config.save(path)
 	if error != OK:
@@ -99,14 +108,19 @@ func load_settings() -> void:
 			GameState.set_setting(setting_name, config.get_value("settings", key))
 	if config.has_section("bindings"):
 		for action: StringName in REBINDABLE:
-			var codes: Array = config.get_value("bindings", String(action), [])
-			if codes.is_empty():
+			var codes: Variant = config.get_value("bindings", String(action), [])
+			if not (codes is Array or codes is PackedInt32Array or codes is PackedInt64Array):
 				continue
 			var events: Array[InputEvent] = []
-			for code: int in codes:
+			var seen: Array[int] = []
+			for code: Variant in codes:
+				if not code is int or code <= KEY_NONE or code == KEY_ESCAPE or seen.has(code):
+					continue
 				var key := InputEventKey.new()
 				key.physical_keycode = code
 				events.append(key)
-			InputActions.replace_action_events(action, events)
+				seen.append(code)
+			if not events.is_empty():
+				InputActions.replace_action_events(action, events)
 	_loading = false
 	bindings_changed.emit()

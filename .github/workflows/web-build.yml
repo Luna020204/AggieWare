@@ -8,6 +8,9 @@
 #   BUTLER_API_KEY secret and the ITCH_TARGET variable (e.g. user/aggieware:html5).
 name: Web build
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -27,6 +30,7 @@ env:
 jobs:
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -63,6 +67,15 @@ jobs:
         with:
           name: aggieware-web-${{ github.sha }}
           path: build/web
+          retention-days: 14
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aggieware-validation-${{ github.sha }}
+          path: build/logs
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Publish to itch.io

@@ -1,27 +1,24 @@
-extends Control
+extends "res://scripts/core/microgame_base.gd"
 
-## SCRUM-85: drag the matching logic gate and inputs into a circuit.
-
-signal round_completed(success: bool)
-signal time_changed(seconds_left: float, round_seconds: float)
-
-@export_range(0, 2, 1) var difficulty: int = 0
-
-const DURATIONS: Array[float] = [10.0, 8.0, 6.0]
+## Drag the matching logic gate and inputs into a circuit.
+const UI := preload("res://scripts/ui/microgame_ui.gd")
+const CardDrag := preload("res://scripts/core/card_drag.gd")
+const DURATIONS: Array[float] = [9.0, 8.0, 7.0]
 const GATE_NAMES: Array[String] = ["AND", "OR", "NOT", "XOR"]
-const SYMBOLS: Dictionary = {"AND": "A · B", "OR": "A + B", "NOT": "¬ A", "XOR": "A ⊕ B"}
+const SYMBOLS: Dictionary = {"AND": "A AND B", "OR": "A OR B", "NOT": "NOT A", "XOR": "A XOR B"}
 
-var _seconds_left := 0.0
-var _ended := false
 var _gate_name := "AND"
 var _placed: Dictionary = {}
 var _cards: Array[Button] = []
-var _dragging: Button
-var _drag_offset := Vector2.ZERO
+var _drag := CardDrag.new()
+var _dragging: Button:
+	get: return _drag.card as Button
+	set(value): _drag.card = value
 var _zones: Dictionary = {}
 var _status_label: Label
 var _timer_label: Label
 var _expression_label: Label
+var _art: Control
 var _rng := RandomNumberGenerator.new()
 
 
@@ -29,105 +26,88 @@ func get_round_seconds() -> float:
 	return DURATIONS[clampi(difficulty, 0, 2)]
 
 
-func _ready() -> void:
-	difficulty = clampi(difficulty, 0, 2)
-	_rng.randomize()
-	_build_ui()
-	_start_round()
-
-
 func _input(event: InputEvent) -> void:
-	if _dragging == null or _ended:
+	if not can_interact():
+		_drag.cancel()
 		return
-	if event is InputEventMouseMotion:
-		_dragging.position = get_global_mouse_position() - _drag_offset
-		get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		_finish_drag()
+	if _drag.handle_input(event):
 		get_viewport().set_input_as_handled()
 
 
-func _process(delta: float) -> void:
-	if _ended:
-		return
-	_seconds_left = maxf(0.0, _seconds_left - delta)
-	_timer_label.text = "TIME  %.1f s" % _seconds_left
-	time_changed.emit(_seconds_left, DURATIONS[difficulty])
-	if _seconds_left <= 0.0:
-		_finish_round(false, "Time's up — rebuild the circuit!")
+func _update_game(_delta: float) -> void:
+	_timer_label.text = "TIME %.1f" % _seconds_left
+	_art.queue_redraw()
 
 
 func _build_ui() -> void:
-	var background := ColorRect.new()
-	background.color = Color("#101a2d")
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
-	var title := Label.new()
-	title.text = "LOGIC GATES"
-	title.position = Vector2(48, 35)
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color("#f5f7ff"))
-	add_child(title)
-	var instruction := Label.new()
-	instruction.text = "Drag the gate and input labels into the matching sockets."
-	instruction.position = Vector2(48, 125)
-	instruction.add_theme_font_size_override("font_size", 20)
-	instruction.add_theme_color_override("font_color", Color("#b8c7e6"))
-	add_child(instruction)
-	_timer_label = Label.new()
-	_timer_label.position = Vector2(48, 182)
-	_timer_label.add_theme_font_size_override("font_size", 23)
-	_timer_label.add_theme_color_override("font_color", Color("#ffd166"))
-	add_child(_timer_label)
-	_expression_label = Label.new()
-	_expression_label.position = Vector2(340, 182)
-	_expression_label.add_theme_font_size_override("font_size", 25)
-	_expression_label.add_theme_color_override("font_color", Color("#ffd166"))
-	add_child(_expression_label)
-	_status_label = Label.new()
-	_status_label.position = Vector2(48, 635)
-	_status_label.size = Vector2(1180, 44)
-	_status_label.add_theme_font_size_override("font_size", 20)
-	_status_label.add_theme_color_override("font_color", Color("#b8c7e6"))
-	add_child(_status_label)
+	_rng.randomize()
+	_drag.dropped.connect(_on_card_dropped)
+	UI.add_backdrop(self, "engineering")
+	_art = UI.pixel_canvas(self, _draw_world)
+	var header := UI.build_header(self, "LOGIC GATES", "CONNECT THE GATE AND INPUTS.", show_internal_timer)
+	_timer_label = header.timer
+	_expression_label = UI.label(self, "", Vector2(450, 200), 28, UI.TEXT, Vector2(650, 40))
+	_status_label = UI.status_label(self)
 	_make_zone("GATE", Vector2(820, 300), "GATE")
 	_make_zone("A", Vector2(500, 455), "INPUT A")
 	_make_zone("B", Vector2(820, 455), "INPUT B")
 
 
 func _make_zone(key: String, zone_position: Vector2, title: String) -> void:
-	var zone := PanelContainer.new()
+	var zone := Control.new()
 	zone.position = zone_position
 	zone.size = Vector2(220, 70)
 	zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#20375d")
-	style.border_color = Color("#73b7ff")
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(9)
-	zone.add_theme_stylebox_override("panel", style)
-	var label := Label.new()
-	label.text = title
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	zone.add_child(label)
 	add_child(zone)
+	var label := UI.label(zone, title, Vector2(0, -35), 21, UI.TEXT, Vector2(220, 30))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_zones[key] = zone
 
 
-func _start_round() -> void:
-	_ended = false
-	_placed.clear()
-	_seconds_left = DURATIONS[difficulty]
-	_gate_name = GATE_NAMES[_rng.randi_range(0, 1 if difficulty == 0 else 3)]
-	_timer_label.text = "TIME  %.1f s" % _seconds_left
-	_expression_label.text = "BUILD  X = %s" % SYMBOLS[_gate_name]
-	_status_label.text = "Match the gate and inputs before time runs out"
+func _draw_world() -> void:
+	_art.draw_rect(Rect2(350, 180, 850, 430), Color("203832"))
+	_art.draw_rect(Rect2(365, 195, 820, 400), Color("365f45"))
+	for at in [Vector2(375, 205), Vector2(1175, 205), Vector2(375, 585), Vector2(1175, 585)]:
+		_art.draw_rect(Rect2(at, Vector2(10, 10)), Color("abb58c"))
+	_art.draw_line(Vector2(610, 490), Vector2(610, 335), Color("b4a669"), 10)
+	_art.draw_line(Vector2(610, 335), Vector2(840, 335), Color("b4a669"), 10)
+	_art.draw_line(Vector2(930, 490), Vector2(1110, 490), Color("b4a669"), 10)
+	_art.draw_line(Vector2(1110, 490), Vector2(1110, 335), Color("b4a669"), 10)
+	_art.draw_line(Vector2(1020, 335), Vector2(1140, 335), Color("b4a669"), 10)
+	_art.draw_rect(Rect2(1135, 320, 25, 25), Color("ffd166") if _placed.has("GATE") else Color("b8574d"))
+	for key: String in _zones:
+		var zone: Control = _zones[key]
+		if not zone.visible:
+			continue
+		_art.draw_rect(Rect2(zone.position, zone.size), Color("152b29"))
+		for pin in 5:
+			var offset := Vector2(10 + pin * 45, -5)
+			_art.draw_rect(Rect2(zone.position + offset, Vector2(15, 10)), Color("d5bc77"))
+			_art.draw_rect(Rect2(zone.position + offset + Vector2(0, zone.size.y), Vector2(15, 10)), Color("d5bc77"))
 	for card: Button in _cards:
-		card.queue_free()
-	_cards.clear()
+		if card != _drag.card:
+			_draw_chip(card)
+	if is_instance_valid(_drag.card):
+		_draw_chip(_drag.card)
+
+
+func _draw_chip(card: Control) -> void:
+	var box := Rect2(card.position, card.size * card.scale)
+	_art.draw_rect(Rect2(box.position + Vector2(5, 5), box.size), Color("172626"))
+	_art.draw_rect(box, Color("394453"))
+	_art.draw_rect(Rect2(box.position + Vector2(5, 5), Vector2(box.size.x - 10, 5)), Color("647783"))
+	for pin in 4:
+		_art.draw_rect(Rect2(box.position + Vector2(10 + pin * 40, -5), Vector2(15, 10)), Color("b7c4bb"))
+		_art.draw_rect(Rect2(box.position + Vector2(10 + pin * 40, box.size.y - 5), Vector2(15, 10)), Color("b7c4bb"))
+
+func _reset_game() -> void:
+	_drag.cancel()
+	_placed.clear()
+	_gate_name = GATE_NAMES[_rng.randi_range(0, 1 if difficulty == 0 else 3)]
+	_timer_label.text = "TIME %.1f" % _seconds_left
+	_expression_label.text = "X = %s" % SYMBOLS[_gate_name]
+	UI.set_status(_status_label, "")
+	UI.clear_nodes(_cards)
 	_zones["B"].visible = _gate_name != "NOT"
 	var choices := 2 if difficulty == 0 else 4
 	for index: int in choices:
@@ -135,7 +115,7 @@ func _start_round() -> void:
 	_make_card("A", "A", Vector2(410, 565))
 	if _gate_name != "NOT":
 		_make_card("B", "B", Vector2(635, 565))
-	time_changed.emit(_seconds_left, DURATIONS[difficulty])
+	_art.queue_redraw()
 
 
 func _make_card(kind: String, value: String, origin: Vector2) -> void:
@@ -143,7 +123,9 @@ func _make_card(kind: String, value: String, origin: Vector2) -> void:
 	card.text = value
 	card.position = origin
 	card.size = Vector2(170, 54)
-	card.add_theme_font_size_override("font_size", 20)
+	card.focus_mode = Control.FOCUS_NONE
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	UI.flat_button(card, 28)
 	card.set_meta("kind", kind)
 	card.set_meta("value", value)
 	card.set_meta("origin", origin)
@@ -153,46 +135,50 @@ func _make_card(kind: String, value: String, origin: Vector2) -> void:
 
 
 func _on_card_input(event: InputEvent, card: Button) -> void:
-	if _ended or card.disabled:
+	if not can_interact() or card.disabled:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_dragging = card
-		_drag_offset = event.position
-		card.z_index = 20
-		card.grab_focus()
+		_drag.begin(card, event.position)
+		get_viewport().set_input_as_handled()
 
 
 func _finish_drag() -> void:
-	if not is_instance_valid(_dragging):
-		_dragging = null
+	_drag.finish()
+
+
+func _on_card_dropped(card: Button) -> void:
+	if not can_interact():
+		card.position = card.get_meta("origin")
 		return
-	var card := _dragging
-	_dragging = null
-	card.z_index = 1
-	var center := card.global_position + card.size * 0.5
 	var kind: String = card.get_meta("kind")
 	var value: String = card.get_meta("value")
-	var zone: PanelContainer = _zones[kind]
-	if zone.get_global_rect().has_point(center) and not _placed.has(kind) and (kind != "GATE" or value == _gate_name):
+	var zone: Control = _zones[kind]
+	if CardDrag.contains_center(card, zone) and not _placed.has(kind) and (kind != "GATE" or value == _gate_name):
 		_placed[kind] = true
-		card.position = zone.position + (zone.size - card.size) * 0.5
+		CardDrag.center_on(card, zone)
 		card.disabled = true
 		card.z_index = 5
-		_status_label.text = "%s connected" % value
 		var needed := 2 if _gate_name == "NOT" else 3
 		if _placed.size() == needed:
-			_finish_round(true, "Circuit complete — X = %s" % SYMBOLS[_gate_name])
+			_finish_round(true, "CIRCUIT COMPLETE!")
 	else:
 		card.position = card.get_meta("origin")
-		_status_label.text = "Wrong socket or gate — try again"
+		show_feedback("WRONG CONNECTION!", UI.REJECT)
+	_art.queue_redraw()
 
 
-func _finish_round(success: bool, message: String) -> void:
-	if _ended:
-		return
-	_ended = true
-	_status_label.text = message
-	_status_label.add_theme_color_override("font_color", Color("#73e6a8") if success else Color("#ff9e9e"))
+func _on_timeout() -> void:
+	_finish_round(false, "TIME'S UP!")
+
+
+func _show_result(_success: bool, _message: String) -> void:
+	_drag.cancel()
+	_art.queue_redraw()
 	for card: Button in _cards:
 		card.disabled = true
-	round_completed.emit(success)
+
+
+func _on_pause_changed(paused: bool) -> void:
+	if paused:
+		_drag.cancel()
+		_art.queue_redraw()
