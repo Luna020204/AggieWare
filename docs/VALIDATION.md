@@ -1,23 +1,85 @@
-# Integration Verification
+# Integration and preservation verification
 
-Verified on Windows with **Godot 4.7.2.stable.official.ed1daf0bf** on November 21, 2026. These results apply to the integrated workspace, not the unchanged source collection in Downloads.
+Review environment: **Windows, Godot 4.7.2.stable.official.ed1daf0bf**, November 21, 2026. This record covers the current integration revision that preserves Luna's PR #16 (`5412665`), including final PR #14 (`6c86ced`). The original five games use the shared framework; Luna's four use `NativeMicrogameSession` for hosted integration without replacing their implementations.
+
+## Confirmed for this review revision
 
 | Check | Result |
 | --- | --- |
-| Editor import, resource registration, enabled authoring plugin | Passed |
-| Source-only copy without the workspace's `.godot` cache | Imported successfully; collection and input suites passed |
-| Collection behavior suite, `tools/test_collection.gd` | 149 checks, 0 failures |
+| Collection behavior, `tools/test_collection.gd` | 232 checks, 0 failures |
+| Actual viewport input, `tools/test_input_routes.gd` | 28 checks, 0 failures |
+| Framework presentation and native preservation, `tools/test_presentation.gd` | 914 checks, 0 failures |
 | Flow smoke subset, `tools/smoke_flow.gd` | 100 checks, 0 failures |
-| Actual viewport input, `tools/test_input_routes.gd` | 17 checks, 0 failures |
-| Crossing framework, `tests/crossing/test_framework.gd` | 56 checks, 0 failures |
-| Native Godot editor, `tests/crossing/native_editor_test.gd` | 12 checks, 0 failures |
-| Render captures with the Compatibility renderer | 9 captures reviewed |
-| Chinese-character scan of source, scenes, custom tools, tests, and documentation | No matches |
+| PR16 native source/assets SHA-256 comparison | All 68 manifest files match `5412665` byte-for-byte |
+| Editor import, catalog contract and launcher | Passed; `MICROGAME_CHECK_OK` |
+| Scope, Swipe/Awake/Microscope rules | Both native-rule smoke suites passed |
+| Accessibility, key remapping and saved settings | `ACCESSIBILITY_SMOKE_OK` |
+| Crossing simulation and authored scenes | 56 checks, 0 failures |
+| Native Godot editor, Inspector and undo/redo | 12 checks, 0 failures |
+| Graphics capture at 1280 x 720 | 36 screens rendered and visually reviewed |
+| Windows build pipeline | All gates passed; actual Web export and ZIP packaging succeeded |
+| Source-only copy without `.godot` cache | Clean import; all 914 presentation checks passed, including 68 native hashes |
+| English source, whitespace and conflict-marker checks | Passed |
 
-The smoke suite is a subset of the collection suite; its checks should not be added to the full suite's total. Input checks dispatch real viewport keyboard and mouse events to verify menu confirmation, mouse upload/submission, transformed card and target geometry, moving targets, standalone retry, and releasing a drag while paused.
+The flow smoke suite overlaps the collection suite. The native hash checks are included in the presentation suite. These counts must not be added together as independent coverage totals. Godot logs are also inspected for errors; exit code zero alone is insufficient.
 
-The collection suite exercises the six-round week through game mechanics, correct and incorrect uploads/gates, registration opening and duplicate clicks, Focus interception and misses, exactly-once results, score/life changes, retry, stale callbacks, pause during results and bike transitions, and synchronized crossing simulation/countdown advancement. Crossing tests cover both movement axes, default scooter speed, explicit speeds, event times and cycle boundaries, collisions, obstacle blocking, pickup extensions, saved authoring data, typed event resources, and native editor undo/redo.
+The preservation manifest is `tools/fixtures/pr16_native_sha256.json`. It includes the four native game scripts, scenes and UIDs; `WalkInIntro`, `MicrogameOverlay` and `PixelText`; all Swipe/Awake PNGs and imports; and both art generators. Shared font files are intentionally outside the manifest: existing glyphs are retained while missing syntax and interface symbols are added.
 
-The rendered captures cover the title, day selection, all five microgames, the pause overlay, and direct F6 play of an authored crossing level at 1280 x 720. Reproduce them with `godot --path . --script res://tools/capture_collection.gd`; this command requires a graphics renderer and writes to `artifacts/collection-preview/`.
+## What the checks cover
 
-See the root README for the behavior and editor test commands. Automated outcomes and layout review do not establish human difficulty balance, frame-rate improvements, web-export compatibility, or cross-platform certification. Those remain separate playtesting and release tasks.
+The presentation tests distinguish the two integration paths. Framework games retain their shared introduction, countdown, timer and result presentation. Native games retain their own timers, fonts, layouts, game rules and result/status displays; the wrapper contains no extra `InstructionPrompt` or `ResultCue`.
+
+| Preserved native game | Easy / Normal / Hard active seconds | Native introduction |
+| --- | --- | --- |
+| Variable Not in Scope | 9 / 7 / 5.5 | 0 seconds |
+| Swipe Card | 9 / 8 / 7 | 3.2-second walk-in |
+| Stay Awake | 8 / 7 / 6 | 3.2-second walk-in |
+| Microscope | 10 / 9 / 8 | 0 seconds |
+
+Swipe/Awake checks cover the authored walk/door/fade sequence, click skipping, unchanged sprites and native popup fade. Awake's projected game and drowsy student states remain part of the native presentation. Scope/Microscope start directly; the host does not invent an introduction for them. Scope preserves its original wrong-answer failure, case-sensitive monospace choices and panel layout. Native UI is intentionally preserved rather than normalized to the framework format.
+
+Hosted checks exercise one pause menu, native timer visibility with the common HUD hidden, one native countdown, result hold/fade before navigation, duplicate completion rejection, stale callbacks, and engine-speed restoration. Scope's choice/code fonts and ordinary labels are compared with the raw standalone scene to detect inherited host typography. Pausing a successful Swipe result preserves the accepted card position.
+
+Relaunch tests create fresh native instances at each difficulty. They verify current wallet contents and stale-instance teardown; they do not claim that Luna's original Swipe script supports changing difficulty and rebuilding the wallet within the same native instance. Wrapper restart detaches the prior child and ignores its later result/time signals.
+
+Collection and input checks also cover the retained six-round week, score/life changes, framework retry, actual viewport interactions, transformed dragging, pause/resume, key remapping and custom scene instructions outside the catalog. Crossing's redundant on-screen Escape/pause text is removed while the Escape action still opens settings. Independent Crossing retains its Play Again result control. Location-name boxes have been removed from its runtime scenery and the framework backdrops; the updated captures confirm these changes.
+
+Crossing mechanics checks cover both movement axes, default 1.5x scooter speed, exact speed overrides, traffic events/cycles, swept collisions, pickups, variables, saved scenes and native editing. Full-screen drawing remains separate from simulation and authored coordinates.
+
+## Reproduce
+
+From the project directory, replace `godot` with the Godot 4.7.2 executable:
+
+```sh
+godot --headless --editor --path . --import --quit
+godot --headless --path . --script res://tools/test_collection.gd
+godot --headless --path . --script res://tools/test_input_routes.gd
+godot --headless --path . --script res://tools/test_presentation.gd
+godot --headless --path . --script res://tools/smoke_flow.gd
+godot --headless --path . --script res://tools/check_microgames.gd
+godot --headless --path . --script res://tools/smoke_variable_scope.gd
+godot --headless --path . --script res://tools/smoke_new_microgames.gd
+godot --headless --path . --script res://tools/smoke_accessibility.gd
+godot --headless --path . --script res://tests/crossing/test_framework.gd
+godot --headless --editor --path . scenes/crossing/campus_intro.tscn -- --test-native-editor
+```
+
+For a clean-source check, create a separate copy of the exact reviewed source without `.godot`, build outputs or capture artifacts, then run import and the same checks there. Keep the original project intact. Capture with a graphics renderer:
+
+```sh
+godot --path . --script res://tools/capture_collection.gd
+```
+
+Inspect full-size images, including native F6 versus hosted presentation, at 1280 x 720. The updated [review galleries](review/format-v1/README.md) show all nine games, Crossing's menus and hosted native results/typography from the new 36-screen set.
+
+The Windows pipeline runs the checks before export:
+
+```powershell
+./tools/build_web.ps1 -Godot "C:/path/to/Godot_v4.7.2-stable_win64_console.exe"
+```
+
+The equivalent shell entry point is `tools/build_web.sh` with `GODOT` selecting the executable. Matching Web export templates are required. Inspect `build/logs/` and the actual exported files before recording success. Publishing is a separate opt-in operation and is not part of this verification record.
+
+The export used the official Godot 4.7.2 Web templates and produced HTML, JavaScript, PCK, WASM and supporting assets in `build/web/`, packaged as `build/aggieware-web.zip`. Documentation, test tools and review captures are excluded from the game export. Nothing was published to itch.io.
+
+Automated tests and captures do not establish human difficulty balance, full accessibility usability, browser interaction, or macOS/Linux runtime behavior. CI rebuilds from the submitted revision independently.

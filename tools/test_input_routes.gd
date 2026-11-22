@@ -3,11 +3,13 @@ extends "res://tools/test_collection.gd"
 ## godot --headless --path . --script res://tools/test_input_routes.gd
 
 func _run() -> void:
+	_test_input_contract()
 	create_timer(20.0, true).timeout.connect(func() -> void:
 		push_error("Input route tests exceeded their deadline.")
 		quit(1))
 	await _test_menu_and_hosted_drag()
 	await _test_transformed_drag_and_retry()
+	await _test_crossing_hud_buttons()
 	print("Input route checks: %d; failures: %d" % [checks, failures])
 	if failures == 0:
 		print("INPUT_ROUTES_OK")
@@ -31,7 +33,7 @@ func _test_menu_and_hosted_drag() -> void:
 	_check(canvas._placed_file == target and canvas._dragging_file == null, "Mouse press, motion, and release uploads the correct file")
 	_click(_viewport_center(canvas._submit_button))
 	_check(canvas._ended and flow.state == flow.FlowState.RESULT and flow.score == 100, "Clicking Submit completes the hosted round exactly once")
-	await _wait_result()
+	await _wait_result(flow)
 	await _dispose(flow)
 
 func _test_transformed_drag_and_retry() -> void:
@@ -75,6 +77,41 @@ func _test_transformed_drag_and_retry() -> void:
 	_drag_between(card, canvas._drop_zone)
 	_check(canvas._placed_file == card, "A fresh drag works after pause and release")
 	await _dispose(canvas)
+
+func _test_crossing_hud_buttons() -> void:
+	var game: Variant = _mount_game("crossing", false)
+	if game == null:
+		return
+	await process_frame
+	var pause_hints: Array[String] = []
+	for candidate: Node in game._play_hud.get_children():
+		if (candidate is Button or candidate is Label) and "PAUSE" in candidate.text.to_upper():
+			pause_hints.append(candidate.text)
+	_check(pause_hints.is_empty(), "Crossing gameplay has no redundant pause hint or button")
+	var initial_progress: float = game.get_crossing_progress()
+	var actions: Variant = root.get_node("InputActions")
+	Input.action_press(actions.ACTION_UP)
+	game._process(0.1)
+	Input.action_release(actions.ACTION_UP)
+	_check(game.get_crossing_progress() > initial_progress, "Crossing progress follows movement toward the goal")
+	await _tap_key(KEY_ESCAPE)
+	var seconds: float = game.get_seconds_left()
+	game._process(0.2)
+	_check(paused and is_equal_approx(game.get_seconds_left(), seconds), "Escape opens Crossing settings and freezes the round")
+	await process_frame
+	var menu: Variant = game.get_node("SettingsPauseMenu")
+	_click(_viewport_center(menu._resume_button))
+	_check(not paused and game.can_interact(), "Clicking Resume returns to the same Crossing round")
+	game.simulation.vehicles[0].position = game.simulation.player
+	game.simulation.vehicles[0].previous = game.simulation.player
+	game.simulation.vehicles[0].speed = 0.0
+	game.hooks.variables["shields"] = 0
+	game.simulation.invulnerable = 0.0
+	game._process(0.01)
+	_check(game._ended and game._retry_button.is_visible_in_tree(), "Standalone Crossing exposes Play Again after a collision")
+	_click(_viewport_center(game._retry_button))
+	_check(game.can_interact() and game.simulation.state == "playing" and is_equal_approx(game.simulation.elapsed, 0.0) and not game._retry_button.visible, "Clicking Play Again resets Crossing traffic, time, and result actions")
+	await _dispose(game)
 
 func _tap_key(code: Key) -> void:
 	var press := InputEventKey.new()

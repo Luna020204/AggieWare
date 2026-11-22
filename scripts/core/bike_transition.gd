@@ -8,6 +8,8 @@ extends Control
 
 signal transition_finished(next_scene_path: String)
 
+const UI := preload("res://scripts/ui/microgame_ui.gd")
+
 @export var next_prompt: String = "CANVAS"
 @export_range(1.0, 10.0, 0.5) var transition_duration: float = 3.0
 @export var auto_advance: bool = true
@@ -31,6 +33,7 @@ const LANE_Y := [245.0, 350.0, 455.0]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
+	UI.apply_theme(self)
 	_build_ui()
 	if not managed_by_flow:
 		var pause_scene: PackedScene = load("res://scenes/ui/settings_pause_menu.tscn")
@@ -80,17 +83,20 @@ func _build_ui() -> void:
 
 	var title := Label.new()
 	title.text = "BIKE TO NEXT CLASS"
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", 28)
+	UI.shadow(title, 28)
 	title.add_theme_color_override("font_color", Color("#f5f7ff"))
 	header.add_child(title)
 
 	_lives_label = Label.new()
-	_lives_label.add_theme_font_size_override("font_size", 20)
+	_lives_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_lives_label, 21)
 	_lives_label.add_theme_color_override("font_color", Color("#ff9e9e"))
 	header.add_child(_lives_label)
 
 	_score_label = Label.new()
-	_score_label.add_theme_font_size_override("font_size", 20)
+	_score_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_score_label, 21)
 	_score_label.add_theme_color_override("font_color", Color("#ffd166"))
 	header.add_child(_score_label)
 
@@ -100,6 +106,7 @@ func _build_ui() -> void:
 	next_label.text = "NEXT UP:  " + next_prompt
 	next_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	next_label.add_theme_font_size_override("font_size", 28)
+	UI.shadow(next_label, 28)
 	next_label.add_theme_color_override("font_color", Color("#73b7ff"))
 	add_child(next_label)
 
@@ -139,7 +146,8 @@ func _build_ui() -> void:
 	_status_label.position = Vector2(0.0, 600.0)
 	_status_label.size = Vector2(1280.0, 42.0)
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label.add_theme_font_size_override("font_size", 18)
+	_status_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_status_label, 21)
 	_status_label.add_theme_color_override("font_color", Color("#b8c7e6"))
 	add_child(_status_label)
 

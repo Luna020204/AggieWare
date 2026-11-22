@@ -11,9 +11,10 @@ enum FlowState { TITLE, STAGE_SELECT, PLAYING, RESULT, TRANSITION, STAGE_CLEAR, 
 
 const BIKE_SCENE := preload("res://scenes/core/bike_transition.tscn")
 const HUD_SCENE := preload("res://scenes/ui/game_hud.tscn")
+const UI := preload("res://scripts/ui/microgame_ui.gd")
 
 @export var week_plan: WeekPlan
-@export_range(0.0, 3.0, 0.05) var result_delay := 0.8
+@export_range(0.0, 3.0, 0.05) var result_delay := 1.4
 @export_range(0.01, 10.0, 0.1) var bike_duration := 3.0
 
 var state: FlowState = FlowState.TITLE
@@ -34,10 +35,12 @@ var _hud: Control
 var _pending_stage := 0
 var _pending_round := 0
 var _run_token := 0
+var _round_success := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
+	UI.apply_theme(self)
 	if week_plan == null:
 		week_plan = load("res://scenes/core/default_week.tres") as WeekPlan
 	_build_shell()
@@ -102,13 +105,15 @@ func _build_shell() -> void:
 	margin.add_child(layout)
 	_header_label = Label.new()
 	_header_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_header_label.add_theme_font_size_override("font_size", 38)
+	_header_label.add_theme_font_size_override("font_size", 42)
+	UI.shadow(_header_label, 42)
 	_header_label.add_theme_color_override("font_color", Color("#f5f7ff"))
 	layout.add_child(_header_label)
 	_subtitle_label = Label.new()
 	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_subtitle_label.add_theme_font_size_override("font_size", 18)
+	_subtitle_label.add_theme_font_size_override("font_size", 21)
+	UI.shadow(_subtitle_label, 21)
 	_subtitle_label.add_theme_color_override("font_color", Color("#b8c7e6"))
 	layout.add_child(_subtitle_label)
 	layout.add_child(HSeparator.new())
@@ -127,7 +132,8 @@ func _show_title() -> void:
 	_add_message("Bike across campus, survive class, and reach the ECS 179 final.")
 	var start_button := _add_button("Start Week", _show_stage_select)
 	start_button.custom_minimum_size.y = 54.0
-	start_button.add_theme_font_size_override("font_size", 22)
+	start_button.add_theme_font_size_override("font_size", 28)
+	UI.shadow(start_button, 28)
 	start_button.grab_focus()
 	_add_message("Use the arrow keys / WASD to choose · Confirm to continue")
 
@@ -165,23 +171,31 @@ func _start_round(stage_index: int, round_index: int) -> void:
 	var stage := week_plan.stages[current_stage]
 	current_round = clampi(round_index, 0, stage.games.size() - 1)
 	var definition := stage.games[current_round]
-	var packed := definition.load_scene()
-	if packed == null:
-		_show_configuration_error("Cannot load: " + definition.scene_path)
+	var entry := MicrogameCatalog.find_by_scene(definition.scene_path).duplicate()
+	entry["scene"] = definition.scene_path
+	entry["title"] = definition.title
+	entry["verb"] = definition.prompt
+	var microgame: Variant = MicrogameCatalog.instantiate(entry, definition.difficulty)
+	if microgame == null:
+		_show_configuration_error("Scene must implement the microgame host or native contract: " + definition.scene_path)
 		return
-	var candidate := packed.instantiate()
-	if not candidate is MicrogameBase:
-		candidate.free()
-		_show_configuration_error("Microgame must extend MicrogameBase: " + definition.scene_path)
-		return
-	var microgame := candidate as MicrogameBase
-	microgame.managed_by_flow = true
-	microgame.show_internal_timer = false
-	microgame.difficulty = definition.difficulty
-	microgame.prompt = definition.prompt
-	microgame.duration_override = definition.round_seconds_override
+	if definition.round_seconds_override > 0.0:
+		if microgame.uses_native_hud():
+			push_warning("Native microgame retains its authored duration: " + definition.scene_path)
+		else:
+			var accepts_override := false
+			for property: Dictionary in microgame.get_property_list():
+				if property["name"] == "duration_override":
+					accepts_override = true
+					break
+			if accepts_override:
+				microgame.set("duration_override", definition.round_seconds_override)
+			else:
+				push_warning("Microgame does not support a duration override: " + definition.scene_path)
+	microgame.result_seconds = result_delay
 	microgame.round_completed.connect(_on_round_completed.bind(_run_token))
 	microgame.time_changed.connect(_on_round_time_changed.bind(_run_token))
+	microgame.result_finished.connect(_on_result_finished.bind(_run_token))
 	current_prompt = definition.prompt
 	state = FlowState.PLAYING
 	_center.hide()
@@ -189,6 +203,7 @@ func _start_round(stage_index: int, round_index: int) -> void:
 	# The HUD is ready before the game's initial time_changed signal fires.
 	_hud = HUD_SCENE.instantiate() as Control
 	add_child(_hud)
+	_hud.bind_game(microgame)
 	_active_scene = microgame
 	add_child(microgame)
 	move_child(_hud, get_child_count() - 1)
@@ -217,18 +232,19 @@ func _on_round_completed(success: bool, token: int = -1) -> void:
 	# Reserve this result synchronously before waiting, so duplicate signals and
 	# callbacks from an earlier run cannot award points or remove lives twice.
 	state = FlowState.RESULT
-	var result_token := _run_token
+	_round_success = success
 	if success:
 		score += 100
 	else:
 		lives -= 1
-	var microgame := _active_scene as MicrogameBase
-	if microgame != null:
-		_on_round_time_changed(microgame.get_seconds_left(), microgame._round_seconds)
-	await get_tree().create_timer(maxf(result_delay, 0.0), false).timeout
-	if not is_inside_tree() or state != FlowState.RESULT or result_token != _run_token:
+	if is_instance_valid(_active_scene):
+		_on_round_time_changed(_active_scene.get_seconds_left(), _active_scene.get_round_duration())
+
+
+func _on_result_finished(token: int = -1) -> void:
+	if state != FlowState.RESULT or (token != -1 and token != _run_token):
 		return
-	if success:
+	if _round_success:
 		if current_round + 1 < week_plan.stages[current_stage].games.size():
 			_begin_transition(current_stage, current_round + 1)
 		else:

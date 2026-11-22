@@ -1,148 +1,172 @@
 # AggieWare
 
-A collection of short games about a week in the life of a UC Davis student, built for ECS 179. Campus Crossing is integrated into the same day sequence, timer, score, lives, pause menu, and retry flow as the original games. All game UI, custom editor tools, code comments, and project documentation are in English.
+An ECS 179 collection of short games about student life at UC Davis. Nine microgames are available through the week flow and debug launcher. The original five use the shared microgame framework; Luna's four retain their PR #16 implementations and connect through an external host adapter. Game UI, custom editor tools, code comments, and current documentation use English.
 
 ## Open and play
 
-Use **Godot 4.7.2-stable**, standard edition, with the GL Compatibility renderer. Import `project.godot` and press **F5** to run the collection. The project uses a 1280 × 720 viewport.
+Use **Godot 4.7.2-stable**, standard edition, with the GL Compatibility renderer. Import `project.godot` and press **F5**. The viewport is 1280 × 720.
 
-Select a day, complete its rounds, and continue through the week. A successful round earns 100 points. A failed round costs one of three lives and retries that round after the bike transition. Losing all lives offers a fresh attempt at the current day. A short instruction prompt appears before each round; the timer starts after it disappears. Pausing freezes the game, transition, and result delay.
+The default week preserves six rounds across five days:
 
-The default week has six rounds across five days:
-
-| Day | Rounds, in order | Difficulty |
+| Day | Rounds | Difficulty |
 | --- | --- | --- |
-| Monday | Canvas Upload → Campus Crossing | 0, 0 |
-| Tuesday | Schedule Builder | 0 |
-| Wednesday | Stay Focused | 1 |
-| Thursday | Logic Gates | 1 |
-| Friday | Canvas Final Upload | 2 |
+| Monday | Canvas Upload → Campus Crossing | Easy, Easy |
+| Tuesday | Schedule Builder | Easy |
+| Wednesday | Stay Focused | Normal |
+| Thursday | Logic Gates | Normal |
+| Friday | Canvas Final Upload | Hard |
 
-Open any of these five microgame scenes and press **F6** to test it independently:
+Each successful round earns 100 points; failure costs one of three lives and retries that round after the bike transition. Day clear follows the last round of a day. Game over offers a fresh attempt at that day. Score, lives, and day sequencing remain host state. Each game retains its own gameplay presentation.
 
-| Microgame | Scene |
-| --- | --- |
-| Canvas Upload | `scenes/microgames/canvas.tscn` |
-| Campus Crossing | `scenes/microgames/crossing.tscn` |
-| Schedule Builder | `scenes/microgames/schedule_builder.tscn` |
-| Stay Focused | `scenes/microgames/stay_focused.tscn` |
-| Logic Gates | `scenes/microgames/gates.tscn` |
+All nine scenes also support independent **F6** play:
 
-Independent microgames receive their own timer, pause menu, and retry control. You can also play `scenes/core/bike_transition.tscn` or `scenes/core/game_flow.tscn` with F6. Stop play with F8 to return to editing.
-
-## Controls
-
-| Shared action | Default binding | Use |
+| Microgame | Launcher ID | Scene |
 | --- | --- | --- |
-| `game_up`, `game_down` | Up / W, Down / S | Movement and menu selection |
+| Canvas Upload | `canvas` | `scenes/microgames/canvas.tscn` |
+| Campus Crossing | `crossing` | `scenes/microgames/crossing.tscn` |
+| Schedule Builder | `schedule` | `scenes/microgames/schedule_builder.tscn` |
+| Stay Focused | `focus` | `scenes/microgames/stay_focused.tscn` |
+| Logic Gates | `gates` | `scenes/microgames/gates.tscn` |
+| Variable Not in Scope | `scope` | `scenes/microgames/variable_scope.tscn` |
+| Swipe Card | `swipe` | `scenes/microgames/swipe_card.tscn` |
+| Stay Awake | `awake` | `scenes/microgames/stay_awake.tscn` |
+| Microscope | `microscope` | `scenes/microgames/microscope.tscn` |
+
+The four additional games are available in the launcher and as configurable week-plan entries. They do not replace the original week. The five framework games support shared pause and **R** retry in F6. Luna's four scenes retain their native F6 behavior and local pause menu; the host adapter is used only when launched through the collection or debug launcher. Their native scenes do not acquire the framework's R-retry or timer-assist lifecycle. Use the launcher to test hosted settings, or F8 and F6 to restart a native scene.
+
+## Presentation and preserved implementations
+
+Canvas, Campus Crossing, Schedule Builder, Stay Focused, and Logic Gates use `MicrogameBase`: a 3.2-second click-skippable introduction, 9 / 8 / 7 seconds of active play, and 1.4 seconds of centered result feedback. Their shared presentation uses AggiePixel text, nearest-neighbor pixel worlds, a top-left TIME label and small game-specific meters.
+
+Luna's four games are preserved from **PR #16, commit `5412665`**, which includes the final **PR #14 commit `6c86ced`**. Their scripts, scenes, presentation helpers, and Swipe/Awake artwork remain unchanged. The integration adapter handles host signals and timing without replacing their visuals or game rules.
+
+| Game | Easy / Normal / Hard active seconds | Native intro | Preserved presentation and rules |
+| --- | --- | --- | --- |
+| Variable Not in Scope | 9 / 7 / 5.5 | None | Monospace code, panels, case-sensitive decoys; a wrong choice fails |
+| Swipe Card | 9 / 8 / 7 | 3.2 seconds, click to skip | Redrawn Peet's entrance, larger walking student, centered dimmed title, wallet and reader; rejected swipes can retry |
+| Stay Awake | 8 / 7 / 6 | 3.2 seconds, click to skip | Building entrance, lecture hall, animated projector, professor, student and Z sprites |
+| Microscope | 10 / 9 / 8 | None | Original procedural eyepiece, reference specimen, minimap, panning and focus rules |
+
+Hosted Luna games retain their own timers and result/status presentation. The collection does not place another prompt, timer or result banner over them. It waits for the result interval before advancing. Native F6 scenes remain independent of that navigation. The AggiePixel font retains its original existing glyphs; the generator adds missing syntax and interface symbols used elsewhere in the collection.
+
+These are deliberate preservation choices, so the producer-format defaults are not universal claims about all nine games. See [Format and Preservation Guide](docs/FORMAT_STANDARD.md) for the boundaries and review procedure.
+
+## Controls and saved settings
+
+| Action | Default | Use |
+| --- | --- | --- |
+| `game_up`, `game_down` | Up / W, Down / S | Movement and selection |
 | `game_left`, `game_right` | Left / A, Right / D | Movement |
-| `game_confirm` | Enter / Space | Menu confirmation and skipping the bike transition |
-| `game_type` | Space / Enter | A microgame's primary interaction |
+| `game_confirm` | Enter / Space | Confirm and skip bike transition |
+| `game_type` | Space / Enter | Primary game interaction |
 | `game_mash` | Space / Enter | Repeated interaction |
 | `game_pause` | Escape | Pause / resume |
-| `game_retry` | R | Restart an independent F6 microgame |
+| `game_retry` | R | Restart an independent framework game |
 
-Canvas and Logic Gates also use mouse dragging; Schedule Builder uses clickable class buttons. Stay Focused uses horizontal movement. Campus Crossing supports all four directions by default; dodge horizontal bicycle and scooter traffic and reach the flag at the top.
+Canvas, Gates, and Swipe Card use dragging; Schedule, Variable Scope, and Stay Awake use clicks. Focus uses horizontal movement or the mouse. Crossing and Microscope use directional movement.
 
-Change bindings in **Project > Project Settings > Input Map**. `InputActions` fills missing or empty actions at startup and preserves existing nonempty bindings. The runtime APIs are `is_pressed`, `is_just_pressed`, `get_strength`, `movement_vector`, `get_action_events`, `replace_action_events`, `reset_action`, and `action_label`. Runtime remapping is not saved to disk.
+Open **Escape → Controls** to rebind movement, confirm, type, mash, and standalone retry. Click a binding and press its replacement; Escape cancels capture while keeping the game paused. Conflicting bindings show a warning. **Reset keys** restores defaults. **Hold instead of mash** repeats the shared mash action every 0.12 game seconds while held.
 
-`GameState` owns pause state and the `music_enabled` / `sfx_enabled` settings. Settings are session-only and are **not persisted**. Future audio playback can read these values or subscribe to `setting_changed`; the current collection has no soundtrack or sound-effect playback system.
+**Timer assist** offers Off, +25%, and +50% real time by slowing active game time in the framework or hosted adapter. Introductions and terminal results remain outside assisted play. Luna's unwrapped F6 scenes keep their authored timing. **Result symbols and low-time warning** controls the shared framework's optional cues; Luna's own result visuals are preserved.
 
-## Edit the week in Godot
+`SettingsStore` saves bindings and options to `user://settings.cfg` and restores them on launch. Script-based tests use isolated settings paths. `InputActions` preserves nonempty project bindings; default bindings can also be edited in Godot's Input Map. Music and sound-effect preferences are stored for future audio playback.
 
-Open `scenes/core/game_flow.tscn`, select **GameFlow**, and expand **Week Plan** in the Inspector. Its assigned resource is `scenes/core/default_week.tres`.
+## Debug launcher
 
-- A `WeekPlan` contains an ordered **Stages** array.
+Open `scenes/debug/microgame_launcher.tscn` and press F6. Select a game and difficulty, choose 0.5×–2× test speed, then launch. Clearing the **Prompt** checkbox skips an existing introduction for quick tests; Scope and Microscope already have no native introduction. Timer assist combines with test speed only during active play. **STOP** returns early; normal completion returns after the result interval without adding a second result banner.
+
+```sh
+godot --path . res://scenes/debug/microgame_launcher.tscn -- --microgame=swipe --difficulty=2 --speed=1.5
+```
+
+`scripts/core/microgame_catalog.gd` lists all nine games and their host metadata. Its factory accepts the common host protocol or wraps a native game in `NativeMicrogameSession`. The catalog supplies launcher availability; the WeekPlan separately controls the main game's order.
+
+## Edit the week
+
+Open `scenes/core/game_flow.tscn`, select **GameFlow**, and expand **Week Plan**. Its resource is `scenes/core/default_week.tres`.
+
+- `WeekPlan.Stages` contains ordered day resources.
 - Each `StageDefinition` has a **Title** and an ordered **Games** array.
-- Each `MicrogameDefinition` sets **Id**, **Title**, **Prompt**, **Scene Path**, **Difficulty**, and optional **Round Seconds Override**. Zero uses the game's normal duration.
+- Each `MicrogameDefinition` sets **Id**, **Title**, **Prompt**, **Scene Path**, **Difficulty**, and **Round Seconds Override**. Zero uses the game's normal duration. A nonzero override applies to framework games; preserved native games retain their authored duration and issue a warning instead.
 
-Reorder the arrays to reorder days or rounds. To add a round, extend a day's **Games** array, create a new `MicrogameDefinition`, and assign a microgame `.tscn` path. Save the resource. The flow automatically updates day/round progress, runs a bike transition between rounds, and shows day clear only after every round in that day succeeds. No game-specific branches in `game_flow.gd` are required.
-
-Resources are shared by default. Use **Make Unique** before changing a duplicated resource when the copy should have independent settings. Keep at least one round per day and use scenes whose root script extends `MicrogameBase`.
+To add a round, extend a day's Games array, create a `MicrogameDefinition`, and assign a microgame scene path. Reorder the arrays to change the sequence. Save the resource and test with F5. Use **Make Unique** before changing duplicated resources independently. Keep at least one round per day. The flow automatically transitions between rounds and waits for all rounds before day clear.
 
 ## Author crossing levels
 
-The level-authoring interface is part of the **Godot editor**. Open `scenes/crossing/campus_intro.tscn` in 2D to edit the example, or save a copy of `scenes/crossing/blank_template.tscn` for a new level. The enabled **Aggie Crossing Level Tools** plugin provides the **Campus Tools** dock and the lane's **Traffic Schedule** Inspector.
+Open `scenes/crossing/campus_intro.tscn` in Godot's 2D editor, or save a copy of `scenes/crossing/blank_template.tscn`. The enabled **Aggie Crossing Level Tools** plugin provides the **Campus Tools** dock and lane **Traffic Schedule** Inspector.
 
-Place road lanes, obstacles, pickups, Start, and Goal as native scene nodes. Set a lane's **Direction**, **Default Speed**, **Cycle Seconds**, and **Events**. Each vehicle event controls its type, spawn time, and speed override. With a zero override, bicycles use the lane speed and scooters use **1.5×** that speed. A nonzero override is an exact speed, so choose scooter overrides above bicycle overrides when keeping that relationship. Vehicles travel horizontally; the player can move in four directions while working toward the top.
+Place native road, obstacle, pickup, Start, and Goal nodes. A lane exposes **Direction**, **Default Speed**, **Cycle Seconds**, and **Events**. Each vehicle event sets its type, spawn time, and optional speed override. With a zero override, bicycles use the lane speed and scooters use **1.5×** that speed. Nonzero overrides are exact speeds. Vehicles move horizontally; the student can move in four directions toward the goal at the top.
 
-Use **Validate** and then F6 to play the authored scene through the same shared microgame lifecycle. F6 does not add the level to the week automatically.
+Play fills the screen with the authored campus, using pixel student, bicycle, scooter, pickup, and obstacle sprites, crosswalks, trees, flowers, and library-side scenery. TIME, crossing progress, and inventory remain small unboxed indicators; pause and independent retry use the shared controls. The full-screen runtime mapping preserves fixed sprite proportions and leaves the native editor grid, object placement, and simulation geometry unchanged.
 
-To use a new layout in the collection:
+Use **Validate**, then F6 to play the authored layout. To include it in the collection:
 
-1. Save the authored level under `scenes/crossing/`.
-2. Open `scenes/microgames/crossing.tscn` and use **Save Scene As** to make a wrapper for that layout.
-3. Select the wrapper's root and set **Level Scene** to the authored level.
-4. Assign that wrapper's scene path to a `MicrogameDefinition` in the week plan.
-5. Set its difficulty and optional duration override, save, and test with F5.
+1. Save the layout under `scenes/crossing/`.
+2. Save a copy of `scenes/microgames/crossing.tscn` as its playable wrapper.
+3. Set the wrapper root's **Level Scene** to the authored layout.
+4. Assign that wrapper's path to a week-plan game definition.
+5. Set difficulty or a duration override, save, and test F5.
 
-Crossing's default round durations are 14, 12, and 10 seconds for difficulties 0, 1, and 2. The authored traffic schedule remains deterministic. The native level's **Initial Variables** and item **Properties** remain available to extensions. `scripts/crossing/game_hooks.gd` provides variable signals, custom item handlers, and vehicle registration; `extensions/crossing/coffee_pickup.gd` is an example.
+Initial Variables and item Properties remain available to extensions. `scripts/crossing/game_hooks.gd` supplies variables, signals, item handlers, and vehicle registration; `extensions/crossing/coffee_pickup.gd` demonstrates a custom pickup. See the [Crossing Level Guide](docs/CROSSING_LEVEL_GUIDE.md) for full authoring and interchange instructions.
 
-See [Crossing Level Guide](docs/CROSSING_LEVEL_GUIDE.md) for step-by-step road and obstacle placement, vehicle timing, JSON interchange, and extension APIs. [Architecture and Refactor Notes](docs/ARCHITECTURE.md) describes the shared components and corrected behavior.
+## Add a microgame
 
-## Add another microgame
-
-Create a full-rect `Control` scene under `scenes/microgames/`, attach a script extending `MicrogameBase`, and implement the relevant hooks:
+For a new framework game, create a full-rect `Control` scene with a script extending `MicrogameBase`. This section applies to framework games, not to the preserved Luna source files.
 
 | Hook / API | Responsibility |
 | --- | --- |
-| `get_round_seconds()` | Return the default duration for the current difficulty. |
-| `_build_ui()` | Build the game's controls once. Honor `show_internal_timer`. |
-| `_reset_game()` | Reset gameplay, visuals, and transient objects for a fresh round. |
-| `_update_game(delta)` | Advance gameplay while the round is active. |
-| `_on_timeout()` | Choose the timeout result; the default is failure. |
-| `_show_result(success, message)` | Present the final result without routing scenes. |
-| `_finish_round(success, message)` | Report an outcome exactly once. |
-| `can_interact()` | Check pause, prompt, remaining time, and completion before handling input. |
-| `get_seconds_left()`, `is_round_finished()` | Read common runtime status. |
+| `get_round_seconds()` | Difficulty-specific active duration; normally 9 / 8 / 7 |
+| `_build_ui()` | Build the pixel world and interactive objects once |
+| `_reset_game()` | Restore a fresh attempt |
+| `_update_game(delta)` | Advance active gameplay |
+| `_on_timeout()` | Choose the outcome at the deadline |
+| `_show_result(success, message)` | Cancel drags/tweens and disable controls; presentation belongs to the base |
+| `_finish_round(success, message)` | Finish once and start shared result feedback |
+| `show_feedback(message, color)` | Temporary central feedback for an incorrect or intermediate action |
+| `can_interact()` | Gate input during introduction, pause, expiry, or completion |
+| `_update_intro_progress(elapsed, duration)` | Optional establishing-scene animation or meter visibility |
+| `_on_pause_changed(paused)` | Cancel transient interaction when needed |
 
-The base owns `_ready`, `_process`, `_start_round`, `_finish_round`, the prompt, countdown, and standalone retry/pause. Do not override those lifecycle methods. Use `_seconds_left` for the current time, `_round_seconds` for the configured duration, and `difficulty` for game-specific tuning. The base bounds the final update to the remaining time, then calls `_on_timeout` only if the game has not finished.
+The base owns `_ready`, `_process`, `_start_round`, `_finish_round`, introductions, results, timer assistance, and standalone pause/retry. Keep those lifecycle methods inherited. `_seconds_left` and `_round_seconds` describe active game time. The base bounds the final update to the remaining duration.
 
-Use the shared input actions instead of raw key codes. Gate button, drag, and other event handlers with `can_interact()`. `scripts/ui/microgame_ui.gd` supplies the common palette, headers, labels, panels, and status text. `scripts/core/card_drag.gd` supplies shared dragging and drop geometry. Keep each game's rules in its own script.
+For framework games, hosts set `managed_by_flow`, `show_internal_timer`, `game_title`, `instruction_text`, `difficulty`, `duration_override`, `playback_speed`, and `result_seconds` before adding the scene. `round_completed(success)` reserves score/lives immediately; **`result_finished()`** permits navigation only after the feedback fade. `time_changed(left, total)` updates the shared timer. Framework games never route themselves or add another hosted pause/intro/result overlay. Preserved native games instead keep their own presentation and expose their original signals through the external adapter.
 
-Before adding a game to the tree, the host sets `managed_by_flow`, `show_internal_timer`, `difficulty`, `prompt`, and `duration_override`. It listens to `round_completed(success)` and `time_changed(seconds_left, round_seconds)`. The host owns navigation, score, and lives; a microgame should not change scenes or create a second hosted pause menu. Independent F6 play automatically adds its own pause menu and result retry hint.
+Use `MicrogameUI` for new framework fonts, shadows, labels, transparent buttons, and pixel canvases. Use `CardDrag` for drag/drop geometry. To integrate an existing authored game, preserve its script and scene. The catalog factory wraps a native `Control` with `round_completed`, `time_changed`, `get_round_seconds()`, `difficulty` and `show_internal_timer` in `scripts/core/native_microgame_session.gd`; no inheritance or presentation rewrite is required. Add an entry to `MicrogameCatalog` for launcher testing, and optionally add a WeekPlan entry for F5. See [Architecture](docs/ARCHITECTURE.md).
 
-Finally, add a `MicrogameDefinition` to the week plan and test both its F6 scene and the F5 collection path.
+## Verify and build
 
-## Project layout
-
-| Location | Purpose |
-| --- | --- |
-| `scenes/core/default_week.tres` | Editable collection order and per-round settings |
-| `scenes/core/` | Main flow and bike transition scenes |
-| `scenes/microgames/` | Playable microgame wrappers |
-| `scenes/crossing/` | Native crossing level-authoring scenes |
-| `scenes/ui/` | Shared HUD and pause menu scenes |
-| `scripts/core/` | Lifecycle, resource types, flow, input, shared state, dragging |
-| `scripts/microgames/` | Individual game rules and crossing adapter |
-| `scripts/ui/` | Shared presentation, HUD, pause settings |
-| `scripts/crossing/` | Crossing simulation, drawing, validation, hooks, timeline |
-| `addons/aggie_crossing/` | Godot editor dock, Inspector, nodes, and resources |
-| `levels/crossing/` | JSON interchange examples; native scenes are the authoring source |
-| `extensions/crossing/` | Example custom pickup behavior |
-| `tools/` | Collection and flow regression checks |
-| `tests/crossing/` | Crossing framework and native editor checks |
-| `assets/art/`, `assets/audio/` | Reserved art and audio folders |
-| `docs/` | Authoring guide and preserved team records |
-
-## Verify changes
-
-Run these commands from the project directory, replacing `godot` with your **Godot 4.7.2** executable:
+From the project directory, replace `godot` with your Godot 4.7.2 executable:
 
 ```sh
 godot --headless --editor --path . --import --quit
-godot --headless --path . --script res://tools/smoke_flow.gd
 godot --headless --path . --script res://tools/test_collection.gd
 godot --headless --path . --script res://tools/test_input_routes.gd
+godot --headless --path . --script res://tools/test_presentation.gd
+godot --headless --path . --script res://tools/check_microgames.gd
+godot --headless --path . --script res://tools/smoke_accessibility.gd
+godot --headless --path . --script res://tools/smoke_variable_scope.gd
+godot --headless --path . --script res://tools/smoke_new_microgames.gd
 godot --headless --path . --script res://tests/crossing/test_framework.gd
 godot --headless --editor --path . scenes/crossing/campus_intro.tscn -- --test-native-editor
 ```
 
-The collection suite covers the shared lifecycle, outcome handling, day/round advancement, retries, pause, input bindings, and individual game rules. The crossing suites cover validation, traffic timing, collisions, pickups, saved scene data, native editor ownership, and undo/redo. Also play F5 and the relevant F6 scenes to check appearance and interaction. See [Integration Verification](docs/VALIDATION.md) for the recorded results and their limits.
+`tools/smoke_flow.gd` is the smaller flow subset. `tools/capture_collection.gd` requires a graphics renderer and produces review captures. `tests/crossing/generate_samples.gd` intentionally replaces the supplied sample layouts; use it only when rebuilding those examples. Recorded results and limits belong in [Validation](docs/VALIDATION.md).
 
-`tests/crossing/generate_samples.gd` rebuilds the supplied sample scenes and JSON. Run it only when intentionally replacing those examples.
+`tools/build_web.ps1` or `tools/build_web.sh` runs the checks and exports the Web preset to `build/web/`, then packages `build/aggieware-web.zip`. Godot 4.7.2 export templates are required. The GitHub workflow builds pull requests and configured release events. Local publishing requires `-Publish` / `--publish`; itch.io publishing requires the configured `BUTLER_API_KEY` secret and `ITCH_TARGET` destination. Build scripts and templates are separate from evidence that an export was successfully validated.
 
-## Team and project history
+## Project layout and credits
+
+| Location | Purpose |
+| --- | --- |
+| `scenes/core/`, `scripts/core/` | Week resources, flow, shared lifecycle, settings, input |
+| `scenes/microgames/`, `scripts/microgames/` | Nine playable games |
+| `scenes/debug/`, `scripts/debug/` | Catalog launcher |
+| `scenes/ui/`, `scripts/ui/` | Shared presentation, pixel worlds, pause UI |
+| `scenes/crossing/`, `addons/aggie_crossing/` | Native crossing levels and editor tools |
+| `scripts/crossing/`, `levels/crossing/`, `extensions/crossing/` | Simulation, interchange data, extension example |
+| `assets/fonts/`, `assets/art/`, `tools/art/` | AggiePixel, sprites, and their generators |
+| `tools/`, `tests/crossing/` | Verification, captures, build tools |
+| `docs/` | Format, authoring, architecture, validation, historical records |
 
 | Name | Main role | Sub-role |
 | --- | --- | --- |
@@ -153,6 +177,6 @@ The collection suite covers the shared lifecycle, outcome handling, day/round ad
 | Diego Beltran | Movement/Physics | Game Feel |
 | Yutong Guo | Technical Artist | Player Onboarding and Tutorial Design |
 
-The team's [original collection README](docs/AGGIEWARE_ORIGINAL_README.md) and [Hongrui's technical record](docs/individual-technical-record-hongrui.md) are preserved as historical records. The original README describes the collection before this integration; this README describes the current structure.
+The [original collection README](docs/AGGIEWARE_ORIGINAL_README.md), [Hongrui's technical record](docs/individual-technical-record-hongrui.md), and [vertical-slice checkpoint](docs/SCRUM-52-vertical-slice-checkpoint.md) are preserved as historical records. This README describes the current implementation.
 
-This integration adds no downloaded art, audio, fonts, or external libraries. Current microgame visuals use Godot controls and procedural 2D drawing. The crossing layout is a fictional campus-inspired example. Record source and license information here when adding outside assets.
+The checked-in generators create the AggiePixel font and Luna's Swipe Card and Stay Awake sprites. The framework environments use procedural pixel drawing. Campus Crossing layouts are fictional. Record sources and licenses when adding outside assets.

@@ -1,92 +1,100 @@
 # AggieWare architecture
 
-The collection now hosts Canvas Upload, Schedule Builder, Stay Focused, Logic Gates, and Campus Crossing through the same round contract. Common code owns the round lifecycle and collection navigation. Each game owns its rules, objects, and success conditions.
+The collection has two integration paths. Canvas, Campus Crossing, Schedule Builder, Stay Focused, and Logic Gates use `MicrogameBase`. Luna's Variable Not in Scope, Swipe Card, Stay Awake, and Microscope retain their native PR #16 scripts and scenes; an external adapter supplies the collection-facing contract. Both paths work with the week flow and debug launcher without requiring a common visual style or identical difficulty timings.
 
 ## Ownership and entry points
 
-| Location | Responsibility |
+| Component | Responsibility |
 | --- | --- |
-| `scenes/core/game_flow.tscn` and `scripts/core/game_flow.gd` | Main collection, menus, days, rounds, score, lives, and transitions |
-| `scenes/core/default_week.tres` | Editable order and configuration of the collection |
-| `scripts/core/microgame_base.gd` | Prompt, countdown, completion, pause integration, and independent retry |
-| `scripts/core/input_actions.gd` | Shared actions and configurable bindings |
-| `scripts/ui/microgame_ui.gd` | Common headers, panels, labels, feedback colors, and node cleanup |
-| `scripts/core/card_drag.gd` | Mouse dragging and drop geometry shared by Canvas and Gates |
-| `scripts/microgames/` | Game-specific rules and the Campus Crossing adapter |
-| `scripts/crossing/` | Crossing simulation, drawing, data validation, and extension hooks |
-| `addons/aggie_crossing/` | Native Godot level editing tools and authored node/resource types |
+| `MicrogameBase` | Framework-game introduction, countdown, feedback, result completion, independent pause/retry |
+| `NativeMicrogameSession` | Wrap an unchanged authored game; bridge signals, intro state, host timing and cleanup |
+| `game_flow.gd` | Day/round order, score, lives, menus and bike transitions |
+| `WeekPlan`, `StageDefinition`, `MicrogameDefinition` | Inspector-editable collection configuration |
+| `MicrogameCatalog`, `microgame_launcher.gd` | Select the integration path and launch isolated difficulty/speed tests |
+| `InputActions`, `GameState`, `SettingsStore`, `Accessibility` | Shared bindings, pause, saved options and hosted active-round speed |
+| `MicrogameUI`, `InstructionPrompt`, `ResultCue`, `game_hud.gd` | Framework presentation and bare TIME display |
+| Luna's `PixelText`, `MicrogameOverlay`, `WalkInIntro` | Preserved native typography, centered messages and building-entry animations |
+| `pixel_backdrop.gd`, `CardDrag` | Framework environments and transformed drag/drop geometry |
+| `scripts/crossing/`, `addons/aggie_crossing/` | Crossing simulation and native Godot level authoring |
 
-F5 starts the collection. F6 on a microgame scene starts an independent round. F6 on an authored crossing level creates the same crossing adapter automatically.
+F5 enters the week flow. F6 on `scenes/debug/microgame_launcher.tscn` opens the catalog. F6 on a framework microgame enters the shared independent lifecycle. F6 on one of Luna's four native scenes runs that original scene, including its local pause menu, without the external adapter. F6 on an authored crossing level creates the Crossing adapter automatically.
 
-## One lifecycle for every game
+## Preservation boundary
 
-`MicrogameBase` extends `Control`. Its `_ready()` builds game UI, creates the prompt, adds a pause menu for independent play, and starts the round. A game implements these hooks:
+The preserved source is PR #16 commit `5412665`, whose parent is final PR #14 commit `6c86ced`. The four game scripts and scenes, their UIDs, `PixelText`, `MicrogameOverlay`, `WalkInIntro`, Swipe/Awake art and imports, and the two art generators are copied without rewriting the implementations. Existing AggiePixel glyphs remain unchanged; the collection's font generator additionally provides missing syntax and interface symbols.
 
-| Hook | Purpose |
+| Native game | Active seconds: Easy / Normal / Hard | Native introduction | Rules and presentation retained |
+| --- | --- | --- | --- |
+| Variable Not in Scope | 9 / 7 / 5.5 | 0 | Monospace code, panel layout, case-sensitive decoys, hard-mode shuffle; wrong choice ends the round |
+| Swipe Card | 9 / 8 / 7 | 3.2 | Latest Peet's exterior and 16 x 30 walker, centered dimmed title, wallet/reader and real-time swipe speed |
+| Stay Awake | 8 / 7 / 6 | 3.2 | Building entrance, lecture hall, animated projector/professor, student states and clickable Z sprites |
+| Microscope | 10 / 9 / 8 | 0 | Procedural eyepiece, reference specimen, minimap, target lock and panning |
+
+Scope's lowercase/uppercase distinction is intentional and uses a case-sensitive monospace font. It must not be converted to the caps-only pixel font. A wrong choice is a failure, not a retry popup. The native duration arrays must not be replaced with the framework's 9 / 8 / 7 defaults as an integration shortcut.
+
+## Framework lifecycle
+
+For the five framework games, `_ready()` builds the world, creates shared presentations, and adds a pause menu only for independent play. `_start_round()` resets common and game-specific state. The default introduction lasts 3.2 seconds and is click-skippable. `_begin_play()` starts accessibility timing and allows interaction.
+
+Each active frame reduces the clock, emits `time_changed(left, total)`, and calls `_update_game(delta)` with at most the remaining duration. Timeout is evaluated afterward. `can_interact()` rejects input during introduction, pause, expiration and completion.
+
+`_finish_round(success, message)` guards completion, restores the previous game speed, invokes cleanup, presents the centered result and emits `round_completed(success)`. After the 1.4-second result interval it emits `result_finished()` once. Incorrect actions that allow another attempt use `show_feedback()` without completing the round.
+
+| Child hook | Purpose |
 | --- | --- |
-| `get_round_seconds()` | Default duration for the selected difficulty |
-| `_build_ui()` | Create the game's controls once |
-| `_reset_game()` | Restore game state and objects for a new attempt |
-| `_update_game(delta)` | Advance game-specific behavior during active play |
-| `_on_timeout()` | Decide the result when time expires; failure is the default |
-| `_show_result(success, message)` | Freeze interactive objects and show feedback |
+| `get_round_seconds()` | Default active duration |
+| `_build_ui()` | Create the world and controls once |
+| `_reset_game()` | Reset rules, objects and transient interaction |
+| `_update_game(delta)` | Advance active simulation |
+| `_on_timeout()` | Select the timeout result |
+| `_show_result(success, message)` | Cancel drags/tweens and disable controls |
+| `_update_intro_progress(elapsed, duration)` | Optional establishing scene or meter visibility |
+| `_on_pause_changed(paused)` | Cancel transient interaction when paused |
 
-Games call `_finish_round(success, message)` and expose the inherited `round_completed(success)` and `time_changed(seconds_left, round_seconds)` signals. They do not duplicate `_ready()`, `_process()`, `_start_round()`, or `_finish_round()`.
+Framework game scripts keep `_ready`, `_process`, `_start_round` and `_finish_round` inherited. The external native adapter is a separate integration boundary, not a template requiring changes to Luna's game scripts.
 
-The one-word prompt precedes active play. The countdown does not run during the prompt or a pause. The base passes only the remaining round time to `_update_game()`, so a long frame cannot simulate gameplay beyond the deadline. It checks timeout after that final simulation interval, allowing a result reached within the interval to stand.
+## Native host adapter
 
-Completion is idempotent: the first result marks the round ended; later calls do nothing. Input handlers use `can_interact()` to reject actions during the prompt, pause, expired clock, or finished round. A reset restores both common and game-specific state.
+The catalog factory creates `scripts/core/native_microgame_session.gd` for the four native scene paths. It recognizes the original native contract (`round_completed`, `time_changed`, `get_round_seconds()`, `difficulty` and `show_internal_timer`) without requiring `MicrogameBase` inheritance. The wrapper instantiates the original scene and passes difficulty before it enters the tree. It exposes the host's completion, time and result-finished interface while leaving the native game responsible for its rules, countdown and presentation. It must not also tick a second gameplay clock or call the framework's visual builder over the native scene.
 
-The host sets `managed_by_flow`, difficulty, prompt, timer visibility, and any duration override before adding the game to the tree. Hosted games use the collection HUD and let the host manage retries. Independent games have one pause menu and the shared retry action, defaulting to R. Result messages display the current retry binding. Input defaults fill missing actions without replacing existing project or player bindings.
+Swipe and Awake retain their own 3.2-second `WalkInIntro`. Scope and Microscope begin immediately. The host's prompt toggle can skip an existing native introduction, but must not invent an additional prompt. The native timer stays in its authored position and the host HUD stays hidden. This prevents a top-left host timer from covering Scope/Microscope's persistent titles.
 
-## The collection is resource-driven
+A native completion signal reserves score/lives once. The wrapper restores hosted speed and waits for the result interval before emitting `result_finished`; it does not add another result banner. Native child processing continues so `MicrogameOverlay` can fade and Awake's projector can animate. The native game's own ended flag blocks further gameplay.
 
-`WeekPlan.stages` is an array of `StageDefinition` resources. Each stage has a title and a `games` array of `MicrogameDefinition` resources. Each game definition contains its ID, title, prompt, scene path, difficulty, and optional duration override. An override of zero uses the game's normal duration.
+For hosted play, the original scene's local pause-menu instance is removed from the runtime instance and the host supplies one pause menu. The source `.tscn` remains untouched. The wrapper cancels a held Swipe card on pause so the mouse release and real-time swipe timestamps cannot span the paused interval. Replacing a hosted round creates a fresh native scene rather than changing the difficulty of an existing wallet.
 
-Edit `scenes/core/default_week.tres` in the Inspector to reorder rounds, add a round to a day, or add a day. Make resources unique before changing copies independently. A game scene must have a `MicrogameBase` root. Invalid plans or scene types produce a configuration error instead of starting an incomplete round.
+Native F6 is deliberately different: the original scene owns its clock, result/status display and local pause menu. It does not receive wrapper navigation, the framework's R-retry lifecycle, or hosted timer assistance. Use the launcher to test those integration features.
 
-`game_flow.gd` owns the sequence. On completion it enters `RESULT` synchronously before changing score or lives and waiting for feedback. Every active scene has a run token. Result, timer, and transition callbacks from an older run are ignored, including callbacks that resume after an asynchronous delay. This prevents duplicate rewards, duplicate life loss, and stale transitions. Active scenes and menu controls are detached before deferred deletion so old controls cannot remain in a newly built screen.
+## Host and registry contracts
 
-## Shared presentation and dragging
+The catalog is the shared creation boundary for both week flow and launcher. Hosts configure difficulty, playback speed, prompt visibility and result wait before adding the returned game. Duration overrides apply to framework games. For a native game, a nonzero WeekPlan override produces a warning and the authored duration remains in force. The collection-facing signals are `time_changed(left, total)`, `round_completed(success)` and `result_finished()`. The host protocol also exposes `get_seconds_left()`, `get_round_duration()`, `get_round_seconds()`, `get_intro_seconds()`, `skip_intro()`, `can_interact()`, `is_playing()`, `is_round_finished()` and `uses_native_hud()`. The host HUD reads these APIs rather than native fields. Native presentation metadata remains authored in the native game; implementation-specific `_intro_left` and overlay fade reads are isolated inside `NativeMicrogameSession`.
 
-`MicrogameUI` supplies the common palette and small control builders. Instructions start below the collection HUD. Internal countdowns are hidden in hosted rounds; Schedule Builder retains its pass-time cue because opening registration is part of the game, but omits its duplicate seconds display. Status feedback resets its color between attempts.
+`WeekPlan.stages` contains ordered days; each day's `games` contains ordered `MicrogameDefinition` resources. The default remains Monday Canvas + Crossing, Tuesday Schedule, Wednesday Focus, Thursday Gates and Friday Canvas. Luna's four games can be added through resource editing without changing their source scenes.
 
-`CardDrag` owns the active card, grab offset, motion, release, and cancellation. Mouse positions are converted into the card parent's coordinates; drop detection and centering use transforms. Canvas and Gates therefore share reliable geometry when their parent is moved or scaled. The helper reports a dropped card; each game decides whether that drop is valid.
+The flow reserves `RESULT` synchronously before changing score or lives. Run tokens protect time, outcome, result-finished and bike callbacks from obsolete rounds. The launcher uses the same guards. Replacement detaches nodes immediately and defers destruction, preventing stale controls from processing on a newer screen.
 
-No shared helper decides which file is correct, how a gate works, when a class opens, or whether a distraction was blocked:
+## Shared systems and art
 
-- **Canvas:** correct-file upload followed by submission, decoy files, moving upload zone, and moving submit button.
-- **Schedule Builder:** a 1.5-second wait, registration buttons, and shuffling unregistered classes. Duration overrides change the available round time while preserving the opening delay.
-- **Stay Focused:** shield movement, thought spawning, blocked/missed counts, and success on surviving the exam.
-- **Logic Gates:** gate selection, input sockets, and the special one-input NOT circuit.
-- **Campus Crossing:** authored traffic, movement, obstacles, pickups, and reaching the goal through its simulation.
+Framework presentation follows the producer-format defaults: AggiePixel, proportional dark shadows, pixel worlds, temporary introductions/results and an unboxed TIME display. `MicrogameUI.build_header()` supplies intro metadata and a timer; its legacy title/instruction nodes are hidden. Framework worlds render to 256 x 144 surfaces enlarged to 1280 x 720 with nearest filtering, while input Controls remain in gameplay coordinates.
 
-## Crossing keeps native Godot authoring
+The native games are explicitly outside that restyling. Swipe and Awake use Luna's 5x nearest sprite artwork and helpers; Scope and Microscope retain their earlier layouts and fonts. Their helpers are retained separately rather than replaced by `MicrogameUI`.
 
-`scripts/microgames/crossing.gd` adapts `scripts/crossing/simulation.gd` to the common lifecycle. It supplies shared input, displays inventory and feedback, and converts simulation win/crash states into round results. It consumes the complete active round interval in bounded simulation calls, keeping traffic and the host clock aligned.
+`CardDrag` converts mouse positions to the card parent's coordinates. Drop geometry works with transformed parents and targets. Canvas and Gates cancel drags on pause/completion; uploaded files follow moving targets. Swipe keeps its own gesture implementation.
 
-The simulation remains independent of the collection UI. It copies authored data for each attempt and owns player movement, scheduled vehicles, collision checks, pickups, and runtime state. `game_hooks.gd` exposes variables, item handlers, vehicle types, and signals for extensions. Initial variables and collected items reset on retry; the authored scene remains the source data.
+`InputActions` preserves nonempty project bindings and creates defaults for missing actions. `GameState` owns pause and validated settings. Pause input runs after UI capture so Escape can cancel rebinding without resuming play. `SettingsStore` saves options and bindings to `user://settings.cfg`; script tests isolate player settings.
 
-Levels remain normal `.tscn` scenes rooted at `CrossingCampusLevel`. Roads and objects are native child nodes edited in the Scene tree, 2D viewport, and Inspector. Each lane's `Events` array contains `CrossingVehicleEvent` resources with vehicle type, spawn time, and speed override. Bicycle defaults use the lane speed; scooter defaults use 1.5 times that speed. A nonzero override is an exact speed. Shared event resources must be made unique when schedules should differ.
+For hosted play, `Accessibility` applies launcher speed divided by timer assistance after the actual introduction ends. It restores the previous speed on completion or detachment. Ownership guards prevent stale cleanup from resetting a newer round's speed. A native rejection popup retains `MicrogameOverlay`'s own game-time fade; the wrapper does not rewrite the helper to impose a different feedback clock.
 
-The Campus Tools dock, timeline Inspector, undo/redo, validation, and JSON interchange remain editor features. There is no separate level-editor game. To include another authored level, duplicate `scenes/microgames/crossing.tscn`, assign its `Level Scene`, and reference that wrapper in the week plan. See [CROSSING_LEVEL_GUIDE.md](CROSSING_LEVEL_GUIDE.md) for the authoring workflow and extension examples.
+## Native crossing authoring
 
-## Correctness fixes in this revision
+Levels remain `.tscn` scenes rooted at `CrossingCampusLevel`. Roads and objects are native child nodes. Each lane's `CrossingVehicleEvent` resources specify type, spawn time and speed override. Default scooters move at 1.5 times the bicycle lane speed; nonzero overrides are exact speeds. Use Make Unique for independent duplicated schedules.
 
-- Canvas no longer restarts itself from its submit button after a result while the collection is waiting to transition. Pending drags are cancelled at completion.
-- Retry cleanup detaches old cards, buttons, and thoughts immediately before deferred deletion. New attempts do not keep stale interactive objects.
-- An uploaded file follows Canvas's moving drop zone.
-- Canvas and Gates use consistent local/global coordinate conversion for dragging and placement.
-- Releasing the mouse while paused or outside the window no longer leaves a stale card drag after resuming.
-- Stay Focused uses small simulation steps so a fast thought cannot jump through the shield on a slow frame.
-- Repeating movement and spawn timers preserve elapsed-time remainders. Schedule shuffling uses its own seedable random generator.
-- Hosted rounds no longer draw duplicate countdowns or duplicate pause menus. Instructions no longer overlap the shared HUD.
-- Collection result handling rejects repeated results and callbacks from obsolete rounds.
+`pixel_campus_renderer.gd` fills the 1280 x 720 playfield. Road/object positions map from the original 840 x 600 coordinates while sprites keep fixed pixel proportions. `campus_canvas.configure_runtime_view()` selects this runtime-only path; the editor retains its original grid and annotations.
 
-These changes target correctness, maintainability, and level authoring. They do not establish an FPS improvement or validate a web export.
+Each attempt copies authored data into the simulation. Initial variables and pickups reset without modifying the authored scene. `game_hooks.gd` exposes item handlers, vehicle registration, variables and signals. The editor dock, timeline, undo/redo, validation and JSON interchange remain native Godot features. See [Crossing Level Guide](CROSSING_LEVEL_GUIDE.md).
 
-## Verification and historical material
+## Verification and history
 
-The collection checks live in `tools/test_collection.gd` and `tools/smoke_flow.gd`. Crossing simulation and native editor checks remain under `tests/crossing/`. Import, automated behavior checks, and visual playtests serve different purposes; consult the final verification results for the checks actually run on this revision.
+Tests must distinguish the two paths: framework lifecycle/presentation checks, native gameplay and preservation checks, and hosted adapter integration checks. Captures should show the preserved native presentation as well as framework scenes. See [Validation](VALIDATION.md) for actual revision evidence; no test counts or platform-validation claims are implied here.
 
-The original group README is preserved as `docs/AGGIEWARE_ORIGINAL_README.md`, and `docs/individual-technical-record-hongrui.md` remains as historical project documentation. Historical documents describe their original version; current setup and editing instructions belong in the main README and crossing level guide. The supplied source archive was left untouched; integration work was completed in a separate project workspace.
+The original README, technical record and vertical-slice checkpoint remain under `docs/` as historical records. Current instructions belong in the root README and current guides. The original Downloads checkout is not the publishing workspace. Integration changes do not imply measured performance improvements or validated release-platform behavior.

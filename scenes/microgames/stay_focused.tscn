@@ -11,3 +11,5 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_focus")
 prompt = "FOCUS"
+game_title = "STAY FOCUSED"
+instruction_text = "MOVE LEFT / RIGHT TO BLOCK."

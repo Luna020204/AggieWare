@@ -8,7 +8,13 @@ const GAME_PATHS := {
 	"stay_focused": "res://scenes/microgames/stay_focused.tscn",
 	"gates": "res://scenes/microgames/gates.tscn",
 	"crossing": "res://scenes/microgames/crossing.tscn",
+	"variable_scope": "res://scenes/microgames/variable_scope.tscn",
+	"swipe_card": "res://scenes/microgames/swipe_card.tscn",
+	"stay_awake": "res://scenes/microgames/stay_awake.tscn",
+	"microscope": "res://scenes/microgames/microscope.tscn",
 }
+const NATIVE_KINDS := ["variable_scope", "swipe_card", "stay_awake", "microscope"]
+const DRIVER := preload("res://tools/microgame_test_driver.gd")
 const PAUSE_SCRIPT := "res://scripts/ui/settings_pause_menu.gd"
 const HUD_SCRIPT := "res://scripts/ui/game_hud.gd"
 var checks := 0
@@ -29,6 +35,8 @@ func _run_suite(thorough: bool) -> void:
 		_test_input_contract()
 		await _test_round_lifecycle()
 		await _test_individual_mechanics()
+		await _test_custom_scene_instruction()
+		await _test_native_host_lifecycle()
 	await _test_week_flow()
 	await _test_failure_and_stale_callbacks()
 	if thorough:
@@ -59,22 +67,42 @@ func _test_input_contract() -> void:
 	actions._ensure_default_actions()
 	var updated := InputMap.action_get_events(action)
 	_check(updated.size() == 1 and updated[0] is InputEventKey and updated[0].physical_keycode == KEY_J, "Input bootstrap preserves customized bindings")
+	_check(actions.action_label(action) == "J", "Custom physical key labels show J without engine-only suffixes")
+	_check(actions.action_label(actions.ACTION_RETRY) == "R", "Default retry key label is the readable letter R")
 	InputMap.action_erase_events(action)
 	for event: InputEvent in original:
 		InputMap.action_add_event(action, event)
 	_check(InputMap.has_action(actions.ACTION_LEFT) and InputMap.has_action(actions.ACTION_PAUSE), "Shared movement and pause actions exist")
 
-func _mount_game(kind: String, managed := true, intro_seconds := 0.0) -> Variant:
+func _mount_game(kind: String, managed := true, intro_seconds := 0.0, difficulty := 0) -> Variant:
 	var packed: PackedScene = load(GAME_PATHS[kind])
 	if not _check(packed != null, "Load " + kind):
 		return null
-	var game: Variant = packed.instantiate()
-	game.managed_by_flow = managed
-	game.show_internal_timer = not managed
-	game.prompt_seconds = intro_seconds
+	var game: Variant
+	if kind in NATIVE_KINDS and managed:
+		var catalog: Script = load("res://scripts/core/microgame_catalog.gd")
+		game = catalog.instantiate(catalog.find_by_scene(GAME_PATHS[kind]), difficulty)
+	else:
+		game = packed.instantiate()
+		if not kind in NATIVE_KINDS:
+			game.managed_by_flow = managed
+			game.show_internal_timer = not managed
+			game.prompt_seconds = intro_seconds
+	game.difficulty = difficulty
 	root.add_child(game)
-	game.set_process(false)
+	DRIVER.freeze(game)
+	if intro_seconds <= 0.0:
+		DRIVER.skip_intro(game)
 	return game
+
+func _game_body(game: Variant) -> Variant:
+	return DRIVER.body(game)
+
+func _tick_game(game: Variant, delta: float) -> void:
+	DRIVER.tick(game, delta)
+
+func _finish_game(game: Variant, success: bool, message := "TEST RESULT") -> void:
+	DRIVER.finish(game, success, message)
 
 func _mount_flow() -> Variant:
 	var packed: PackedScene = load("res://scenes/core/game_flow.tscn")
@@ -82,7 +110,7 @@ func _mount_flow() -> Variant:
 		return null
 	var flow: Variant = packed.instantiate()
 	flow.result_delay = 0.001
-	# Complete bike transitions manually; only the result boundary waits.
+	# Advance result presentation and bike transitions deterministically.
 	flow.bike_duration = 999.0
 	root.add_child(flow)
 	flow.set_process(false)
@@ -92,9 +120,8 @@ func _prepare_round(flow: Variant) -> Variant:
 	var game: Variant = flow._active_scene
 	if not _check(is_instance_valid(game) and game.has_method("can_interact"), "Flow mounted a microgame"):
 		return null
-	game.set_process(false)
-	game.prompt_seconds = 0.0
-	game._start_round()
+	DRIVER.freeze(game)
+	DRIVER.skip_intro(game)
 	return game
 
 func _dispose(node: Node) -> void:
@@ -103,8 +130,10 @@ func _dispose(node: Node) -> void:
 		node.queue_free()
 	await process_frame
 
-func _wait_result() -> void:
-	await create_timer(0.015, true).timeout
+func _wait_result(flow: Variant) -> void:
+	if flow.state == flow.FlowState.RESULT and is_instance_valid(flow._active_scene):
+		_tick_game(flow._active_scene, 1.5)
+	await process_frame
 
 func _finish_bike(flow: Variant) -> void:
 	if not _check(flow.state == flow.FlowState.TRANSITION, "Bike transition is present"):
@@ -145,11 +174,11 @@ func _test_round_lifecycle() -> void:
 			continue
 		var results: Array[bool] = []
 		timed.round_completed.connect(func(success: bool) -> void: results.append(success))
-		timed._seconds_left = 0.005
-		timed._process(0.01)
-		var expected: bool = kind == "stay_focused"
-		_check(timed._ended and results == [expected], kind + " resolves its deadline correctly")
-		timed._finish_round(not expected, "Duplicate deadline")
+		_game_body(timed)._seconds_left = 0.005
+		_tick_game(timed, 0.01)
+		var expected: bool = kind in ["stay_focused", "stay_awake"]
+		_check(timed.is_round_finished() and results == [expected], kind + " resolves its deadline correctly")
+		_finish_game(timed, not expected, "Duplicate deadline")
 		_check(results.size() == 1, kind + " emits one deadline result")
 		await _dispose(timed)
 
@@ -167,7 +196,7 @@ func _test_individual_mechanics() -> void:
 	if schedule != null:
 		schedule._register(0)
 		_check(schedule._registered == 0, "Schedule rejects registration before opening")
-		schedule._seconds_left = schedule.WINDOWS[schedule.difficulty]
+		schedule._seconds_left = schedule._round_seconds - schedule.OPEN_DELAY
 		schedule._register(0)
 		schedule._register(0)
 		_check(schedule._registered == 1, "Schedule cannot register a class twice")
@@ -236,7 +265,7 @@ func _test_week_flow() -> void:
 			_check(flow.state == flow.FlowState.RESULT, "Completion immediately enters result state")
 			game.round_completed.emit(true)
 			_check(flow.score == completed * 100 and flow.lives == 3, "Success updates score exactly once")
-			await _wait_result()
+			await _wait_result(flow)
 			if round_index + 1 < stage.games.size():
 				_check(cleared.size() == day, "Day remains open until all of its games finish")
 				_finish_bike(flow)
@@ -249,6 +278,122 @@ func _test_week_flow() -> void:
 	_check(cleared == [0, 1, 2, 3, 4] and flow.state == flow.FlowState.TITLE, "Friday returns to title with each day cleared once")
 	await _dispose(flow)
 
+func _test_custom_scene_instruction() -> void:
+	# A newly authored scene is valid without a debug-catalog entry.
+	var source: PackedScene = load(GAME_PATHS["canvas"])
+	var custom: Variant = source.instantiate()
+	var instruction := "PLACE THE ASSIGNMENT FILE."
+	custom.instruction_text = instruction
+	var packed := PackedScene.new()
+	var pack_result := packed.pack(custom)
+	custom.free()
+	if not _check(pack_result == OK, "Pack a custom microgame fixture"):
+		return
+	var scene_path := "user://validation_custom_canvas_%d.tscn" % OS.get_process_id()
+	if not _check(ResourceSaver.save(packed, scene_path) == OK, "Save a custom microgame outside the catalog"):
+		return
+	var flow: Variant = _mount_flow()
+	if flow != null:
+		flow.week_plan = flow.week_plan.duplicate(true)
+		flow.week_plan.stages[0].games[0].scene_path = scene_path
+		flow._start_stage(0)
+		var game: Variant = flow._active_scene
+		_check(game.instruction_text == instruction and game._intro_view.instruction_label.text == instruction, "WeekPlan preserves scene-authored instructions when the scene is absent from the debug catalog")
+		await _dispose(flow)
+	_check(DirAccess.remove_absolute(ProjectSettings.globalize_path(scene_path)) == OK, "Remove the temporary custom microgame fixture")
+
+func _test_native_host_lifecycle() -> void:
+	var catalog: Script = load("res://scripts/core/microgame_catalog.gd")
+	var flow: Variant = _mount_flow()
+	if flow == null:
+		return
+	flow.week_plan = flow.week_plan.duplicate(true)
+	# Native games are supported in an authored WeekPlan, not only the launcher.
+	for kind: String in NATIVE_KINDS:
+		flow.week_plan.stages[1].games[0].scene_path = GAME_PATHS[kind]
+		flow._start_stage(1)
+		var session: Variant = flow._active_scene
+		DRIVER.freeze(session)
+		var native: Variant = _game_body(session)
+		_check(session.uses_native_hud() and native.get_script().resource_path == "res://scripts/microgames/%s.gd" % kind, kind + " is hosted through its unchanged native implementation")
+		_check(_count_script(flow, PAUSE_SCRIPT) == 1 and _count_script(flow, HUD_SCRIPT) == 1, kind + " has exactly one host pause overlay and one hidden host HUD")
+		flow._hud._process(0.0)
+		_check(not flow._hud.visible and native.show_internal_timer, kind + " retains its native timer without a duplicate host timer")
+		var full: float = session.get_round_seconds()
+		var has_intro := kind in ["swipe_card", "stay_awake"]
+		_check(is_equal_approx(session.get_intro_seconds(), 3.2 if has_intro else 0.0) and session.is_playing() != has_intro, kind + " retains its authored intro policy")
+		DRIVER.skip_intro(session)
+		_tick_game(session, 0.1)
+		_check(session.can_interact() and is_equal_approx(session.get_seconds_left(), full - 0.1), kind + " advances only its native countdown")
+		var before_pause: float = session.get_seconds_left()
+		root.get_node("GameState").pause_game()
+		_tick_game(session, 0.5)
+		_check(is_equal_approx(session.get_seconds_left(), before_pause) and not session.can_interact(), kind + " freezes during the shared pause")
+		root.get_node("GameState").resume_game()
+		if kind == "variable_scope":
+			await _check_scope_font(native, "Week flow")
+		var results: Array[bool] = []
+		session.round_completed.connect(func(success: bool) -> void: results.append(success))
+		var expected_score: int = flow.score + 100
+		_win_game(kind, session)
+		_check(results == [true] and flow.state == flow.FlowState.RESULT and flow.score == expected_score, kind + " forwards one mechanic win into the collection")
+		native.round_completed.emit(true)
+		_check(results == [true] and flow.score == expected_score, kind + " ignores duplicate native completion")
+		var accepted_card_position: Vector2 = native._card.position if kind == "swipe_card" else Vector2.ZERO
+		root.get_node("GameState").pause_game()
+		_tick_game(session, 2.0)
+		_check(flow.state == flow.FlowState.RESULT, kind + " holds native results while paused")
+		if kind == "swipe_card":
+			_check(native._card.position == accepted_card_position, "Pausing a successful Swipe result preserves the accepted card position")
+		root.get_node("GameState").resume_game()
+		_tick_game(session, 1.0)
+		_check(flow.state == flow.FlowState.RESULT, kind + " does not truncate its native readable result interval")
+		_tick_game(session, 0.5)
+		_check(flow.state == flow.FlowState.STAGE_CLEAR, kind + " advances once after the native result completes")
+	await _dispose(flow)
+	# Relaunching reconstructs native game state; native scripts do not promise
+	# that changing difficulty in place rebuilds their authored scene objects.
+	var launcher: Variant = load("res://scenes/debug/microgame_launcher.tscn").instantiate()
+	root.add_child(launcher)
+	for difficulty: int in [0, 2, 0, 1]:
+		launcher.launch(catalog.find_index("swipe"), difficulty, 2)
+		var session: Variant = launcher._active
+		DRIVER.freeze(session)
+		DRIVER.skip_intro(session)
+		var native: Variant = _game_body(session)
+		var ids: Array = native._cards.map(func(card: TextureRect) -> String: return native.card_id(card))
+		_check(ids.size() == difficulty + 2 and ids.count("aggie") == 1, "Swipe relaunch rebuilds the correct wallet at difficulty %d" % difficulty)
+		native.begin_drag(native._card.position + native.CARD_SIZE * 0.5)
+		_check(native._dragging, "Swipe enters an active drag before relaunch")
+	launcher.launch(catalog.find_index("scope"), 2, 2)
+	DRIVER.freeze(launcher._active)
+	await _check_scope_font(_game_body(launcher._active), "Launcher")
+	var session: Variant = launcher._active
+	var obsolete: Variant = session.native_game
+	var old_token: int = launcher._run_token
+	session.restart_round()
+	DRIVER.freeze(session)
+	obsolete.round_completed.emit(true)
+	obsolete.time_changed.emit(-9.0, 99.0)
+	launcher._on_result_finished(old_token - 1)
+	_check(launcher._running and not session.is_round_finished() and is_equal_approx(session.get_seconds_left(), session.get_round_seconds()), "Native restart ignores old game results, clock updates, and host callbacks")
+	_check(obsolete.get_parent() == null and session.native_game != obsolete, "Native restart detaches the old implementation immediately")
+	await _dispose(launcher)
+
+func _check_scope_font(hosted: Variant, context: String) -> void:
+	var standalone: Variant = load(GAME_PATHS["variable_scope"]).instantiate()
+	root.add_child(standalone)
+	standalone.set_process(false)
+	var actual: Font = hosted._choice_buttons[0].get_theme_font("font")
+	var expected: Font = standalone._choice_buttons[0].get_theme_font("font")
+	_check(actual is SystemFont and expected is SystemFont and actual.font_names == expected.font_names and actual.resource_path != "res://assets/fonts/aggie_pixel.fnt", context + " preserves Scope's case-sensitive standalone choice font")
+	_check(hosted._code_label.get_theme_font("normal_font") is SystemFont, context + " preserves the monospace code font")
+	for field: String in ["_status_label", "_timer_label"]:
+		var label: Label = hosted.get(field)
+		var raw: Label = standalone.get(field)
+		_check(label.get_theme_font("font") == raw.get_theme_font("font") and label.get_theme_color("font_shadow_color") == raw.get_theme_color("font_shadow_color") and label.get_theme_constant("shadow_offset_x") == raw.get_theme_constant("shadow_offset_x") and label.get_theme_constant("shadow_offset_y") == raw.get_theme_constant("shadow_offset_y"), context + " isolates native %s typography from the host theme" % field)
+	await _dispose(standalone)
+
 func _test_failure_and_stale_callbacks() -> void:
 	var flow: Variant = _mount_flow()
 	if flow == null:
@@ -260,6 +405,7 @@ func _test_failure_and_stale_callbacks() -> void:
 	var current_timer_text: String = flow._hud._timer_label.text
 	old_game.round_completed.emit(true)
 	old_game.time_changed.emit(-900.0, 900.0)
+	old_game.result_finished.emit()
 	flow._on_round_completed(true, old_token)
 	_check(flow.state == flow.FlowState.PLAYING and flow.current_stage == 1 and flow.score == 0 and flow.lives == 3, "Replaced game cannot report a late result")
 	_check(flow._hud._timer_label.text == current_timer_text, "Replaced game cannot overwrite the new HUD timer")
@@ -267,7 +413,7 @@ func _test_failure_and_stale_callbacks() -> void:
 	flow._start_stage(0)
 	_win_canvas(_prepare_round(flow))
 	flow._start_stage(1)
-	await _wait_result()
+	await _wait_result(flow)
 	_check(flow.state == flow.FlowState.PLAYING and flow.current_stage == 1, "Old result timer cannot replace a new scene")
 	flow.score = 0
 	flow.lives = 3
@@ -277,7 +423,7 @@ func _test_failure_and_stale_callbacks() -> void:
 		game._finish_round(false, "Test failure")
 		game.round_completed.emit(false)
 		_check(flow.lives == 2 - loss and flow.score == 0, "Failure removes exactly one life")
-		await _wait_result()
+		await _wait_result(flow)
 		if loss < 2:
 			_finish_bike(flow)
 	_check(flow.state == flow.FlowState.GAME_OVER, "Three failures end the week")
@@ -286,10 +432,10 @@ func _test_failure_and_stale_callbacks() -> void:
 	var state_node: Variant = root.get_node("GameState")
 	_prepare_round(flow)._finish_round(false, "Pause during result")
 	state_node.pause_game()
-	await _wait_result()
+	await _wait_result(flow)
 	_check(flow.state == flow.FlowState.RESULT and flow.lives == 2, "Pause holds the result timer without consuming another life")
 	state_node.resume_game()
-	await _wait_result()
+	await _wait_result(flow)
 	if _check(flow.state == flow.FlowState.TRANSITION, "Resuming a result continues into its transition"):
 		var bike: Variant = flow._active_scene
 		bike.set_process(false)
@@ -354,11 +500,12 @@ func _test_crossing_pause_and_collision() -> void:
 	_check(game.simulation.state == "crashed" and game._ended and outcomes == [false], "Traffic collision reports exactly one loss to the host contract")
 	await _dispose(game)
 
-func _win_game(kind: String, game: Variant) -> void:
+func _win_game(kind: String, session: Variant) -> void:
+	var game: Variant = _game_body(session)
 	match kind:
 		"canvas": _win_canvas(game)
 		"schedule_builder":
-			game._seconds_left = game.WINDOWS[game.difficulty]
+			game._seconds_left = game._round_seconds - game.OPEN_DELAY
 			for index: int in game._buttons.size():
 				game._register(index)
 		"stay_focused":
@@ -367,6 +514,20 @@ func _win_game(kind: String, game: Variant) -> void:
 			game._seconds_left = 0.005
 			game._process(0.01)
 		"gates": _win_gates(game)
+		"variable_scope":
+			for choice: Button in game._choice_buttons:
+				if choice.get_meta("correct", false):
+					game._choose(choice)
+					break
+		"stay_awake":
+			for z: Button in game._zs.duplicate():
+				game.pop_z(z)
+			game._seconds_left = 0.005
+			game._process(0.01)
+		"microscope":
+			game.camera = game._target_pos
+			game.confirm()
+		"swipe_card": _win_swipe(game)
 		"crossing":
 			game.simulation.vehicles.clear()
 			game.simulation.schedules.clear()
@@ -377,6 +538,28 @@ func _win_game(kind: String, game: Variant) -> void:
 			game._process(0.1)
 			Input.action_release(actions.ACTION_UP)
 		_: _check(false, "Unknown game mechanic: " + kind)
+
+func _win_swipe(game: Variant) -> void:
+	var window: Vector2 = game.get_speed_window()
+	var speed := (window.x + window.y) * 0.5
+	var card: TextureRect = game._card
+	var y: float = game._scanner.position.y + game._scanner.size.y * 0.5
+	var start := Vector2(game.card_home(card).x + game.CARD_SIZE.x * 0.5, y)
+	game.begin_drag(card.position + game.CARD_SIZE * 0.5, card)
+	card.position = start - game.CARD_SIZE * 0.5
+	game._drag_offset = game.CARD_SIZE * 0.5
+	var left: float = game._scanner.position.x
+	var right: float = left + game._scanner.size.x
+	var usec := 1000000
+	var x: float = start.x
+	for step_index: int in 200:
+		if not game._dragging or x > right + 40.0:
+			break
+		game.drag_to(Vector2(x, y), usec)
+		x += 20.0
+		if x >= left:
+			usec += int(20.0 / speed * 1000000.0)
+	game.release()
 
 func _left_press() -> InputEventMouseButton:
 	var event := InputEventMouseButton.new()

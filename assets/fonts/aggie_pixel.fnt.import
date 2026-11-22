@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://3hou538ka3ac"
+path="res://.godot/imported/aggie_pixel.fnt-9872b3f621c044e0685b7ad7c2905234.fontdata"
+
+[deps]
+
+source_file="res://assets/fonts/aggie_pixel.fnt"
+dest_files=["res://.godot/imported/aggie_pixel.fnt-9872b3f621c044e0685b7ad7c2905234.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2
