@@ -30,19 +30,12 @@ signal time_changed(seconds_left: float, round_seconds: float)
 @export var show_internal_timer: bool = true
 
 const DURATIONS: Array[float] = [9.0, 8.0, 7.0]
-## Intro timeline, in seconds: the walk, the door, fade to black, fade in.
-const INTRO_SECONDS := 3.2
-const WALK_END := 2.2
-const DOOR_END := 2.5
-const BLACK_AT := 2.85
-const STEP_SECONDS := 0.14
-## The student's feet, in exterior-art pixels: from below the steps to the door.
+## The walk-in intro (WalkInIntro): its length, the student's feet from below
+## the steps to the door, and the door, all in exterior-art pixels.
+const INTRO_SECONDS := WalkInIntro.DURATION
 const WALK_PATH: Array[Vector2] = [Vector2(130, 150), Vector2(150, 126), Vector2(211, 118)]
-const WALK_FRAMES := [1, 0, 2, 0]
 const WALKER_SIZE := Vector2(16.0, 30.0)
-const DOOR_POS := Vector2(196.0, 74.0)
-const POP_SECONDS := 1.4
-const POP_FADE := 0.4
+const DOOR_RECT := Rect2(196.0, 74.0, 30.0, 44.0)
 ## Accepted swipe speed through the scanner, in pixels per real second.
 const SPEED_MIN: Array[float] = [200.0, 450.0, 550.0]
 const SPEED_MAX: Array[float] = [4000.0, 1800.0, 1400.0]
@@ -67,8 +60,6 @@ const CARD_TEXTURES := {
 	"rewards": preload(ART + "rewards_card.png"),
 	"license": preload(ART + "license_card.png"),
 }
-const PIXEL_FONT := preload("res://assets/fonts/aggie_pixel.fnt")
-const SHADOW := Color("#14121a")
 const PX := 5.0
 ## The reader art is 32x52 with its slot on rows 24-26.
 const SCANNER_RECT := Rect2(560.0, 250.0, 160.0, 260.0)
@@ -85,7 +76,6 @@ const METER_MAX_SPEED := 3000.0
 
 var _seconds_left := 0.0
 var _intro_left := 0.0
-var _pop_left := 0.0
 var _ended := false
 var _elapsed := 0.0
 var _dragging := false
@@ -103,15 +93,15 @@ var _scanner: TextureRect
 var _slot: ColorRect
 var _light: Label
 var _timer_label: Label
-## The intro's title and instruction.
+## Shared text layer: intro title, result pops and the dim behind them.
+var _overlay: MicrogameOverlay
+## The intro's title and instruction (the overlay's).
 var _intro: Control
+var _walk_in: WalkInIntro
+## The walk-in's outside scene and student, for tests.
 var _exterior: Control
 var _walker: TextureRect
-var _door: TextureRect
-var _fade: ColorRect
-## Darkens the scene behind the intro title and result messages so they read clearly.
-var _dim: ColorRect
-## Result messages; they pop up in the middle of the screen and fade.
+## Result messages (the overlay's pop label).
 var _status_label: Label
 var _meter: Control
 
@@ -144,48 +134,11 @@ func skip_intro() -> void:
 	_update_intro()
 
 
-func _update_dim() -> void:
-	var title_alpha := _intro.modulate.a if _intro.visible else 0.0
-	_dim.color.a = maxf(0.45 * title_alpha, 0.55 * _status_label.modulate.a)
-
-
 ## Lays out the intro for the current moment of its timeline.
 func _update_intro() -> void:
-	var t := INTRO_SECONDS - _intro_left
 	var running := _intro_left > 0.0
-	_intro.visible = running
-	_intro.modulate.a = clampf((DOOR_END - t) / (DOOR_END - WALK_END), 0.0, 1.0)
-	_exterior.visible = running and t < BLACK_AT
-	_walker.visible = t < WALK_END
-	if _walker.visible:
-		var feet := _walk_point(t / WALK_END)
-		_walker.position = (feet - Vector2(WALKER_SIZE.x * 0.5, WALKER_SIZE.y)) * PX
-		_walker.texture = WALKER_TEXTURES[WALK_FRAMES[int(t / STEP_SECONDS) % WALK_FRAMES.size()]]
-	_door.visible = t >= WALK_END - 0.1
-	var black := 0.0
-	if running and t >= DOOR_END:
-		if t < BLACK_AT:
-			black = (t - DOOR_END) / (BLACK_AT - DOOR_END)
-		else:
-			black = 1.0 - (t - BLACK_AT) / (INTRO_SECONDS - BLACK_AT)
-	_fade.color.a = clampf(black, 0.0, 1.0)
-	_update_dim()
-
-
-## A point along WALK_PATH, 0 at the start and 1 at the door.
-func _walk_point(progress: float) -> Vector2:
-	progress = clampf(progress, 0.0, 1.0)
-	var lengths: Array[float] = []
-	var total := 0.0
-	for i: int in WALK_PATH.size() - 1:
-		lengths.append(WALK_PATH[i].distance_to(WALK_PATH[i + 1]))
-		total += lengths[i]
-	var along := progress * total
-	for i: int in lengths.size():
-		if along <= lengths[i] or i == lengths.size() - 1:
-			return WALK_PATH[i].lerp(WALK_PATH[i + 1], clampf(along / lengths[i], 0.0, 1.0))
-		along -= lengths[i]
-	return WALK_PATH[-1]
+	var title_alpha := _walk_in.show_at(INTRO_SECONDS - _intro_left if running else INTRO_SECONDS)
+	_overlay.set_intro(running, title_alpha)
 
 
 func _ready() -> void:
@@ -195,10 +148,6 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _pop_left > 0.0:
-		_pop_left = maxf(0.0, _pop_left - delta)
-		_status_label.modulate.a = clampf(_pop_left / POP_FADE, 0.0, 1.0)
-	_update_dim()
 	if _ended:
 		return
 	if _intro_left > 0.0:
@@ -301,20 +250,10 @@ func _judge_swipe(speed: float) -> void:
 
 
 func _reject(message: String) -> void:
-	_pop(message, Color("#ffb38a"), 28)
+	_overlay.pop(message, Color("#ffb38a"), 28)
 	_light.text = "✗"
 	_light.add_theme_color_override("font_color", Color("#ff9e9e"))
 	_reset_card()
-
-
-## Shows a message in the middle of the screen; it fades on its own.
-func _pop(message: String, color: Color, font_size: int) -> void:
-	_status_label.text = message
-	_status_label.add_theme_color_override("font_color", color)
-	_status_label.add_theme_font_size_override("font_size", font_size)
-	_set_shadow(_status_label, font_size)
-	_status_label.modulate.a = 1.0
-	_pop_left = POP_SECONDS
 
 
 ## Puts the held card back in its wallet slot.
@@ -334,7 +273,7 @@ func _wallet_slot(slot: int) -> Vector2:
 func _build_ui() -> void:
 	# Pixel art stays crisp only with nearest filtering; children inherit it.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_apply_pixel_font()
+	PixelText.apply_theme(self)
 
 	add_child(_pixel_rect(BACKGROUND_TEXTURE, Vector2.ZERO, Vector2(1280.0, 720.0)))
 
@@ -375,7 +314,7 @@ func _build_ui() -> void:
 	add_child(pocket)
 
 	# Top left: the timer, with the swipe speed meter under it.
-	_timer_label = _text_label(28, Color("#ffd166"))
+	_timer_label = PixelText.label(28, Color("#ffd166"))
 	_timer_label.position = Vector2(32, 24)
 	_timer_label.visible = show_internal_timer
 	add_child(_timer_label)
@@ -387,79 +326,17 @@ func _build_ui() -> void:
 	add_child(_meter)
 
 	# The intro's outside scene, over everything until the fade.
-	_exterior = Control.new()
-	_exterior.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_exterior.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_exterior.add_child(_pixel_rect(EXTERIOR_TEXTURE, Vector2.ZERO, Vector2(1280.0, 720.0)))
-	_door = _pixel_rect(DOOR_OPEN_TEXTURE, DOOR_POS * PX, Vector2(30.0, 44.0) * PX)
-	_exterior.add_child(_door)
-	_walker = _pixel_rect(WALKER_TEXTURES[0], Vector2.ZERO, WALKER_SIZE * PX)
-	_exterior.add_child(_walker)
-	add_child(_exterior)
-	_fade = ColorRect.new()
-	_fade.color = Color(0.0, 0.0, 0.0, 0.0)
-	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(_fade)
+	_walk_in = WalkInIntro.new()
+	add_child(_walk_in)
+	_walk_in.build(EXTERIOR_TEXTURE, DOOR_OPEN_TEXTURE, DOOR_RECT, WALKER_TEXTURES, WALKER_SIZE, WALK_PATH)
+	_exterior = _walk_in.scene
+	_walker = _walk_in.walker
 
-	_dim = ColorRect.new()
-	_dim.color = Color(0.0, 0.0, 0.0, 0.0)
-	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(_dim)
-
-	_status_label = _text_label(28, Color.WHITE)
-	_status_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_status_label.modulate.a = 0.0
-	add_child(_status_label)
-
-	# The intro's title and instruction, centred on the screen.
-	_intro = VBoxContainer.new()
-	_intro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_intro.alignment = BoxContainer.ALIGNMENT_CENTER
-	_intro.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_intro.add_theme_constant_override("separation", 24)
-	var title := _text_label(70, Color("#ffbf00"))
-	title.text = "SWIPE CARD"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_intro.add_child(title)
-	var instruction := _text_label(28, Color.WHITE)
-	instruction.text = "Find your Aggie Card, then swipe!"
-	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_intro.add_child(instruction)
-	add_child(_intro)
-
-
-func _text_label(font_size: int, color: Color) -> Label:
-	var label := Label.new()
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	_set_shadow(label, font_size)
-	return label
-
-
-## A dark drop shadow one font pixel down and right, so text reads over the art.
-func _set_shadow(label: Label, font_size: int) -> void:
-	var offset := maxi(font_size / 7, 1)
-	label.add_theme_color_override("font_shadow_color", SHADOW)
-	label.add_theme_constant_override("shadow_offset_x", offset)
-	label.add_theme_constant_override("shadow_offset_y", offset)
-
-
-## Uses AggiePixel for every label and drawn string in this microgame, scaled
-## by whole pixels, with the engine font as a fallback for anything it lacks.
-func _apply_pixel_font() -> void:
-	var font: FontFile = PIXEL_FONT
-	font.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_INTEGER_ONLY
-	if font.fallbacks.is_empty():
-		font.fallbacks = [ThemeDB.fallback_font]
-	var pixel_theme := Theme.new()
-	pixel_theme.default_font = font
-	pixel_theme.default_font_size = 21
-	theme = pixel_theme
+	_overlay = MicrogameOverlay.new()
+	add_child(_overlay)
+	_overlay.build("SWIPE CARD", "Find your Aggie Card, then swipe!")
+	_intro = _overlay.intro
+	_status_label = _overlay.status_label
 
 
 func _pixel_rect(texture: Texture2D, at: Vector2, rect_size: Vector2) -> TextureRect:
@@ -475,7 +352,7 @@ func _pixel_rect(texture: Texture2D, at: Vector2, rect_size: Vector2) -> Texture
 
 func _draw_meter() -> void:
 	var font := get_theme_default_font()
-	_shadowed_string(font, Vector2(0.0, 16.0), "SWIPE SPEED", 14, Color("#f5f7ff"))
+	PixelText.draw_shadowed(_meter, font, Vector2(0.0, 16.0), "SWIPE SPEED", 14, Color("#f5f7ff"))
 	var bar := Rect2(0.0, 30.0, _meter.size.x, 26.0)
 	_meter.draw_rect(bar, Color("#0e161e"))
 	var low := clampf(SPEED_MIN[difficulty] / METER_MAX_SPEED, 0.0, 1.0) * bar.size.x
@@ -487,17 +364,11 @@ func _draw_meter() -> void:
 		_meter.draw_line(Vector2(x, bar.position.y), Vector2(minf(x + 10.0, high), bar.end.y), Color("#73e6a8"), 2.0)
 		x += 14.0
 	_meter.draw_rect(bar, Color("#8aa0b8"), false, 2.0)
-	_shadowed_string(font, Vector2(0.0, 80.0), "SLOW", 14, Color("#f5f7ff"))
-	_shadowed_string(font, Vector2(bar.size.x - 46.0, 80.0), "FAST", 14, Color("#f5f7ff"))
+	PixelText.draw_shadowed(_meter, font, Vector2(0.0, 80.0), "SLOW", 14, Color("#f5f7ff"))
+	PixelText.draw_shadowed(_meter, font, Vector2(bar.size.x - 46.0, 80.0), "FAST", 14, Color("#f5f7ff"))
 	if _last_speed >= 0.0:
 		var px := clampf(_last_speed / METER_MAX_SPEED, 0.0, 1.0) * bar.size.x
 		_meter.draw_line(Vector2(px, bar.position.y - 6.0), Vector2(px, bar.end.y + 6.0), Color("#ffffff"), 4.0)
-
-
-func _shadowed_string(font: Font, at: Vector2, text: String, font_size: int, color: Color) -> void:
-	var offset := float(maxi(font_size / 7, 1))
-	_meter.draw_string(font, at + Vector2(offset, offset), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SHADOW)
-	_meter.draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
 func _start_round() -> void:
@@ -505,15 +376,13 @@ func _start_round() -> void:
 	_elapsed = 0.0
 	_seconds_left = DURATIONS[difficulty]
 	_intro_left = INTRO_SECONDS
-	_pop_left = 0.0
-	_status_label.text = ""
+	_overlay.clear_pop()
 	_last_speed = -1.0
 	_scanner.position = SCANNER_RECT.position
 	_held = null
 	_reset_card()
 	_deal_cards()
 	_update_intro()
-	_update_dim()
 	_timer_label.text = "TIME %.1f" % _seconds_left
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
 
@@ -541,5 +410,5 @@ func _finish_round(success: bool, message: String) -> void:
 	_dragging = false
 	_intro_left = 0.0
 	_update_intro()
-	_pop(message, Color("#73e6a8") if success else Color("#ff9e9e"), 42)
+	_overlay.pop(message, Color("#73e6a8") if success else Color("#ff9e9e"), 42)
 	round_completed.emit(success)

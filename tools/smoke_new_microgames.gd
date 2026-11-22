@@ -152,8 +152,20 @@ func _stay_awake() -> void:
 	_assert(speeds[0] < speeds[1] and speeds[1] < speeds[2], "awake: Z's do not get faster")
 	_assert(sizes[0] > sizes[1] and sizes[1] > sizes[2], "awake: Z's do not get smaller %s" % [sizes])
 
-	# Real clicks pop Z's; surviving to the bell wins once.
+	# The intro holds the timer; a click skips it.
 	var game := await _spawn(scene, 1)
+	var full: float = game._seconds_left
+	for i: int in 5:
+		await process_frame
+	_assert(game._seconds_left == full and game._overlay.intro.visible, "awake: timer ran during the intro")
+	_assert(game._walk_in.scene.visible and game._walk_in.walker.visible, "awake: intro does not show the building and the student")
+	await _click(Vector2(640.0, 200.0))
+	_assert(game._intro_left == 0.0 and not game._overlay.intro.visible, "awake: a click did not skip the intro")
+	game.queue_free()
+
+	# Real clicks pop Z's; surviving to the bell wins once.
+	game = await _spawn(scene, 1)
+	game.skip_intro()
 	var results := _watch(game)
 	game._spawn_clock = -100.0  # no random spawns during this check
 	var z1: Button = game.spawn_z(Vector2(200.0, 250.0))
@@ -169,6 +181,7 @@ func _stay_awake() -> void:
 
 	# A Z that reaches the student fails the round exactly once.
 	game = await _spawn(scene, 0)
+	game.skip_intro()
 	results = _watch(game)
 	game._spawn_clock = -100.0
 	var near: Button = game.spawn_z(game.STUDENT_CENTER - Vector2(30.0, 30.0))
@@ -181,6 +194,7 @@ func _stay_awake() -> void:
 
 	# Untouched, Z's spawn by themselves and the round fails before the bell.
 	game = await _spawn(scene, 2)
+	game.skip_intro()
 	results = _watch(game)
 	var frames := 0
 	while results.is_empty() and frames < 2000:
