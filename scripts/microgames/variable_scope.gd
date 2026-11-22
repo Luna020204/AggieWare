@@ -2,9 +2,18 @@ extends Control
 
 ## SCRUM-23: Variable Not in Scope (Lecture Hall).
 ##
-## A short C++ snippet fails to compile because one variable was never
-## declared. Click the candidate line that declares it before time runs out.
-## Mouse and click only; no typing. A wrong click fails the round.
+## A short C++ snippet on the student's laptop fails to compile because one
+## variable was never declared. Click the quick-fix line that declares it
+## before time runs out. Mouse and click only; no typing. A wrong click fails
+## the round.
+##
+## Follows the AggieWare format standard: the round opens with the student
+## walking into the lecture building while the title and instruction show
+## (WalkInIntro; the timer waits, a click skips it), only the timer during
+## play, and results as centred pops. The scene is pixel art drawn at 1/5
+## scale (tools/art/gen_variable_scope_art.py) and shown at 5x; the code on
+## the laptop is in AggieMono, a pixel font with lower case
+## (tools/art/gen_mono_font.py), because `y` and `Y` must look different.
 ##
 ## Difficulty (0..2):
 ##   less time (9 / 7 / 5.5 s), more choices (2 / 3 / 4),
@@ -30,10 +39,44 @@ const NAME_SETS: Array = [
 	["base", "bonus", "score"],
 ]
 const OPERATORS: Array[String] = ["+", "-", "*"]
-const CHOICE_TOP := 190.0
-const CHOICE_GAP := 104.0
+## The walk-in intro reuses the lecture building from Stay Awake: the
+## student's feet from the walkway to the entrance, and the doors.
+const INTRO_SECONDS := WalkInIntro.DURATION
+const WALK_PATH: Array[Vector2] = [Vector2(70, 150), Vector2(120, 134), Vector2(210, 122)]
+const WALKER_SIZE := Vector2(16.0, 30.0)
+const DOOR_RECT := Rect2(194.0, 84.0, 32.0, 38.0)
+const BUILDING_TEXTURE := preload("res://assets/art/microgames/stay_awake/building_exterior.png")
+const BUILDING_DOOR_TEXTURE := preload("res://assets/art/microgames/stay_awake/building_door_open.png")
+const WALKER_TEXTURES := [
+	preload("res://assets/art/microgames/swipe_card/student_walk_0.png"),
+	preload("res://assets/art/microgames/swipe_card/student_walk_1.png"),
+	preload("res://assets/art/microgames/swipe_card/student_walk_2.png"),
+]
+const SEAT_TEXTURE := preload("res://assets/art/microgames/variable_scope/lecture_seat.png")
+const MONO := preload("res://assets/fonts/aggie_mono.fnt")
+## AggieMono is 8 px tall; 24 shows it at 3x, 16 at 2x.
+const CODE_SIZE := 24
+const SMALL_SIZE := 16
+const CHAR_WIDTH := 18.0  # one 6 px cell at 3x
+const LINE_GAP := 6
+## Where things sit on the laptop screen (see the art script's regions).
+const TAB_POS := Vector2(166.0, 94.0)
+const GUTTER_X := 167.0
+const CODE_POS := Vector2(215.0, 138.0)
+const TERMINAL_POS := Vector2(170.0, 470.0)
+const CHOICE_X := 740.0
+const CHOICE_TOP := 140.0
+const CHOICE_GAP := 72.0
+const CHOICE_SIZE := Vector2(365.0, 60.0)
+const PX := 5.0
+const KEYWORD := Color("#c792ea")
+const CODE_TEXT := Color("#d8dee9")
+const DIM_TEXT := Color("#5c6370")
+const ERROR_TEXT := Color("#ff6b7a")
+const GOOD_TEXT := Color("#73e6a8")
 
 var _seconds_left := 0.0
+var _intro_left := 0.0
 var _ended := false
 var _shuffle_clock := 0.0
 var _missing := "y"
@@ -43,18 +86,42 @@ var _value := 5
 var _declared_value := 3
 var _expression := "x + y"
 var _correct_line := ""
+var _fixed := false
 var _choice_buttons: Array[Button] = []
 var _rng := RandomNumberGenerator.new()
 
 var _code_label: RichTextLabel
+var _gutter_label: Label
+## The compiler output in the laptop's terminal panel.
 var _error_label: Label
+var _squiggle: Control
 var _timer_label: Label
+var _walk_in: WalkInIntro
+var _overlay: MicrogameOverlay
+## Result messages (the overlay's pop label).
 var _status_label: Label
-var _mono: SystemFont
 
 
 func get_round_seconds() -> float:
 	return DURATIONS[clampi(difficulty, 0, 2)]
+
+
+## Time before the round timer starts, for tools that wait for a timeout.
+func get_intro_seconds() -> float:
+	return INTRO_SECONDS
+
+
+## Ends the intro at once. Public for tests.
+func skip_intro() -> void:
+	_intro_left = 0.0
+	_update_intro()
+
+
+## Lays out the intro for the current moment of its timeline.
+func _update_intro() -> void:
+	var running := _intro_left > 0.0
+	var title_alpha := _walk_in.show_at(INTRO_SECONDS - _intro_left if running else INTRO_SECONDS)
+	_overlay.set_intro(running, title_alpha)
 
 
 func _ready() -> void:
@@ -67,8 +134,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _ended:
 		return
+	if _intro_left > 0.0:
+		_intro_left = maxf(0.0, _intro_left - delta)
+		_update_intro()
+		return
 	_seconds_left = maxf(0.0, _seconds_left - delta)
-	_timer_label.text = "TIME  %.1f s" % _seconds_left
+	_timer_label.text = "TIME %.1f" % _seconds_left
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
 	if difficulty >= 2:
 		_shuffle_clock += delta
@@ -76,99 +147,93 @@ func _process(delta: float) -> void:
 			_shuffle_clock = 0.0
 			_shuffle_choices()
 	if _seconds_left <= 0.0:
-		_finish_round(false, "Time's up — the build is still red!")
+		_show_needed_line()
+		_finish_round(false, "TIME'S UP! STILL BROKEN.")
+
+
+func _input(event: InputEvent) -> void:
+	if _intro_left > 0.0 and not _ended and event is InputEventMouseButton and event.pressed:
+		skip_intro()
+		get_viewport().set_input_as_handled()
 
 
 func _build_ui() -> void:
-	_mono = SystemFont.new()
-	_mono.font_names = PackedStringArray(["Consolas", "Cascadia Mono", "Courier New", "DejaVu Sans Mono", "monospace"])
+	# Pixel art stays crisp only with nearest filtering; children inherit it.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	PixelText.apply_theme(self)
+	var mono: FontFile = MONO
+	mono.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_INTEGER_ONLY
 
-	var background := ColorRect.new()
-	background.color = Color("#1a1420")
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	var seat := TextureRect.new()
+	seat.texture = SEAT_TEXTURE
+	seat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	seat.stretch_mode = TextureRect.STRETCH_SCALE
+	seat.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(seat)
 
-	# Lecture hall: rows of seats along the bottom edge.
-	for row: int in 2:
-		var seats := ColorRect.new()
-		seats.color = Color("#2b2033") if row == 0 else Color("#33263d")
-		seats.position = Vector2(0.0, 676.0 + row * 22.0)
-		seats.size = Vector2(1280.0, 22.0)
-		seats.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(seats)
-
-	var title := Label.new()
-	title.text = "NOT IN SCOPE"
-	title.position = Vector2(48, 35)
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color("#f5f7ff"))
-	add_child(title)
-
-	var instruction := Label.new()
-	instruction.text = "Lecture Hall · Click the line that fixes the compile error."
-	instruction.position = Vector2(48, 92)
-	instruction.add_theme_font_size_override("font_size", 20)
-	instruction.add_theme_color_override("font_color", Color("#c9b8e6"))
-	add_child(instruction)
-
-	_timer_label = Label.new()
-	_timer_label.position = Vector2(48, 132)
-	_timer_label.add_theme_font_size_override("font_size", 22)
-	_timer_label.add_theme_color_override("font_color", Color("#ffd166"))
-	_timer_label.visible = show_internal_timer
-	add_child(_timer_label)
-
-	# Projector screen holding the code.
-	var screen := PanelContainer.new()
-	screen.position = Vector2(48, 180)
-	screen.size = Vector2(620, 190)
-	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	screen.add_theme_stylebox_override("panel", _panel_style(Color("#0f1117"), Color("#6c5a8c")))
-	add_child(screen)
+	# The editor on the laptop: tab name, line numbers, code, error squiggle.
+	add_child(_mono_label("main.cpp", SMALL_SIZE, CODE_TEXT, TAB_POS))
+	_gutter_label = _mono_label("", CODE_SIZE, DIM_TEXT, Vector2(GUTTER_X, CODE_POS.y))
+	_gutter_label.add_theme_constant_override("line_spacing", LINE_GAP)
+	add_child(_gutter_label)
 	_code_label = RichTextLabel.new()
 	_code_label.bbcode_enabled = true
 	_code_label.fit_content = true
 	_code_label.scroll_active = false
+	_code_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_code_label.position = CODE_POS
+	_code_label.size = Vector2(520.0, 220.0)
 	_code_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_code_label.add_theme_font_override("normal_font", _mono)
-	_code_label.add_theme_font_override("bold_font", _mono)
-	_code_label.add_theme_font_size_override("normal_font_size", 24)
-	_code_label.add_theme_font_size_override("bold_font_size", 24)
-	screen.add_child(_code_label)
+	_code_label.add_theme_font_override("normal_font", mono)
+	_code_label.add_theme_font_size_override("normal_font_size", CODE_SIZE)
+	_code_label.add_theme_color_override("default_color", CODE_TEXT)
+	_code_label.add_theme_constant_override("line_separation", LINE_GAP)
+	add_child(_code_label)
+	_squiggle = Control.new()
+	_squiggle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_squiggle.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_squiggle.draw.connect(_draw_squiggle)
+	add_child(_squiggle)
 
-	var error_panel := PanelContainer.new()
-	error_panel.position = Vector2(48, 390)
-	error_panel.size = Vector2(620, 84)
-	error_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	error_panel.add_theme_stylebox_override("panel", _panel_style(Color("#2a1216"), Color("#ff6b7a")))
-	add_child(error_panel)
-	_error_label = Label.new()
-	_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_error_label.add_theme_font_override("font", _mono)
-	_error_label.add_theme_font_size_override("font_size", 19)
-	_error_label.add_theme_color_override("font_color", Color("#ff9e9e"))
-	error_panel.add_child(_error_label)
+	# The terminal panel under the editor.
+	_error_label = _mono_label("", CODE_SIZE, ERROR_TEXT, TERMINAL_POS)
+	_error_label.add_theme_constant_override("line_spacing", LINE_GAP)
+	add_child(_error_label)
 
-	var pick := Label.new()
-	pick.text = "Add which line?"
-	pick.position = Vector2(740, 146)
-	pick.add_theme_font_size_override("font_size", 22)
-	pick.add_theme_color_override("font_color", Color("#c9b8e6"))
-	add_child(pick)
+	# Top left: the timer only.
+	_timer_label = PixelText.label(28, Color("#ffd166"))
+	_timer_label.position = Vector2(32, 24)
+	_timer_label.visible = show_internal_timer
+	add_child(_timer_label)
 
-	_status_label = Label.new()
-	_status_label.position = Vector2(48, 500)
-	_status_label.size = Vector2(1180, 48)
-	_status_label.add_theme_font_size_override("font_size", 22)
-	_status_label.add_theme_color_override("font_color", Color("#c9b8e6"))
-	add_child(_status_label)
+	_walk_in = WalkInIntro.new()
+	add_child(_walk_in)
+	_walk_in.build(BUILDING_TEXTURE, BUILDING_DOOR_TEXTURE, DOOR_RECT, WALKER_TEXTURES, WALKER_SIZE, WALK_PATH)
+
+	_overlay = MicrogameOverlay.new()
+	add_child(_overlay)
+	_overlay.build("NOT IN SCOPE", "Click the line that fixes the build!")
+	_status_label = _overlay.status_label
+
+
+func _mono_label(text: String, font_size: int, color: Color, at: Vector2) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.position = at
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_override("font", MONO)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	return label
 
 
 func _start_round() -> void:
 	_ended = false
+	_fixed = false
 	_shuffle_clock = 0.0
 	_seconds_left = DURATIONS[difficulty]
+	_intro_left = INTRO_SECONDS
 	var names: Array = NAME_SETS[_rng.randi_range(0, NAME_SETS.size() - 1)]
 	var missing_first := _rng.randf() < 0.5
 	_missing = names[0] if missing_first else names[1]
@@ -181,31 +246,58 @@ func _start_round() -> void:
 	_correct_line = "int %s = %d;" % [_missing, _value]
 
 	_render_code(false)
-	_error_label.text = "main.cpp:3: error: '%s' was not declared in this scope" % _missing
-	_status_label.text = "Which declaration makes it compile?"
-	_status_label.add_theme_color_override("font_color", Color("#c9b8e6"))
+	_error_label.text = "main.cpp:3: error:\n'%s' was not declared in this scope" % _missing
+	_error_label.add_theme_color_override("font_color", ERROR_TEXT)
 
 	for button: Button in _choice_buttons:
 		button.queue_free()
 	_choice_buttons.clear()
 	var lines := build_choices()
 	for index: int in lines.size():
-		var button := Button.new()
-		button.text = lines[index]
+		var button := _choice_button(lines[index])
 		button.set_meta("correct", lines[index] == _correct_line)
 		button.position = _slot_position(index)
-		button.size = Vector2(492, 84)
-		button.focus_mode = Control.FOCUS_NONE  # mouse only
-		button.add_theme_font_override("font", _mono)
-		button.add_theme_font_size_override("font_size", 26)
-		button.add_theme_stylebox_override("normal", _panel_style(Color("#241c30"), Color("#6c5a8c")))
-		button.add_theme_stylebox_override("hover", _panel_style(Color("#33284a"), Color("#c9b8e6")))
-		button.add_theme_stylebox_override("pressed", _panel_style(Color("#33284a"), Color("#ffd166")))
-		button.add_theme_stylebox_override("disabled", _panel_style(Color("#1d1726"), Color("#3d3350")))
-		button.pressed.connect(_choose.bind(button))
 		add_child(button)
+		# Keep choices under the walk-in scene and the text overlay.
+		move_child(button, _walk_in.get_index())
 		_choice_buttons.append(button)
+	_timer_label.text = "TIME %.1f" % _seconds_left
+	_overlay.clear_pop()
+	_update_intro()
 	time_changed.emit(_seconds_left, DURATIONS[difficulty])
+
+
+## A quick-fix suggestion on the editor: flat pixel rows, no rounded boxes.
+func _choice_button(line: String) -> Button:
+	var button := Button.new()
+	button.text = line
+	button.size = CHOICE_SIZE
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE  # mouse only
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_override("font", MONO)
+	button.add_theme_font_size_override("font_size", CODE_SIZE)
+	button.add_theme_color_override("font_color", CODE_TEXT)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.add_theme_color_override("font_disabled_color", DIM_TEXT)
+	button.add_theme_stylebox_override("normal", _row_style(Color("#2a2f3c"), Color("#3a4152")))
+	button.add_theme_stylebox_override("hover", _row_style(Color("#34405a"), Color("#e8a048")))
+	button.add_theme_stylebox_override("pressed", _row_style(Color("#34405a"), Color("#ffd166")))
+	button.add_theme_stylebox_override("disabled", _row_style(Color("#23262f"), Color("#2c313c")))
+	button.pressed.connect(_choose.bind(button))
+	return button
+
+
+## A flat row with a 5 px bar on the left (one art pixel), like an IDE list.
+func _row_style(background: Color, bar: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = bar
+	style.border_width_left = int(PX)
+	style.content_margin_left = 20
+	style.content_margin_right = 12
+	return style
 
 
 ## Returns the shuffled candidate lines for the current puzzle. Exactly one is
@@ -245,22 +337,42 @@ func build_choices() -> Array[String]:
 
 
 func _render_code(fixed: bool) -> void:
+	_fixed = fixed
+	var kw := "[color=#%s]int[/color]" % KEYWORD.to_html(false)
 	var lines: Array[String] = [
-		"[color=#c792ea]int[/color] main() {",
-		"    [color=#c792ea]int[/color] %s = %d;" % [_declared, _declared_value],
+		"%s main() {" % kw,
+		"  %s %s = %d;" % [kw, _declared, _declared_value],
 	]
 	if fixed:
-		lines.append("    [color=#73e6a8]%s[/color]" % _correct_line)
-		lines.append("    [color=#c792ea]int[/color] %s = %s;" % [_result, _expression])
-	else:
-		lines.append("    [color=#c792ea]int[/color] %s = [bgcolor=#5a1d26]%s[/bgcolor];" % [_result, _expression])
-	lines.append("    [color=#c792ea]return[/color] %s;" % _result)
+		lines.append("  [color=#%s]%s[/color]" % [GOOD_TEXT.to_html(false), _correct_line])
+	lines.append("  %s %s = %s;" % [kw, _result, _expression])
+	lines.append("  [color=#%s]return[/color] %s;" % [KEYWORD.to_html(false), _result])
 	lines.append("}")
 	_code_label.text = "\n".join(lines)
+	var numbers: Array[String] = []
+	for i: int in lines.size():
+		numbers.append(str(i + 1))
+	_gutter_label.text = "\n".join(numbers)
+	_squiggle.queue_redraw()
+
+
+## The red pixel zigzag under the expression that uses the missing variable
+## (line 3, until the fix goes in above it).
+func _draw_squiggle() -> void:
+	if _fixed:
+		return
+	var column := ("  int %s = " % _result).length()
+	var line_height := float(CODE_SIZE + LINE_GAP)
+	var start := CODE_POS + Vector2(column * CHAR_WIDTH, 2.0 * line_height + CODE_SIZE + 2.0)
+	var dot := Vector2(3.0, 3.0)  # one font pixel at 3x
+	var steps := int(_expression.length() * CHAR_WIDTH / dot.x)
+	for i: int in steps:
+		var lift := 0.0 if i % 4 < 2 else dot.y
+		_squiggle.draw_rect(Rect2(start + Vector2(i * dot.x, lift), dot), ERROR_TEXT)
 
 
 func _slot_position(index: int) -> Vector2:
-	return Vector2(740.0, CHOICE_TOP + index * CHOICE_GAP)
+	return Vector2(CHOICE_X, CHOICE_TOP + index * CHOICE_GAP)
 
 
 func _shuffle_choices() -> void:
@@ -274,39 +386,37 @@ func _shuffle_choices() -> void:
 
 
 func _choose(button: Button) -> void:
-	if _ended:
+	if _ended or _intro_left > 0.0:
 		return
 	var correct: bool = button.get_meta("correct")
-	for other: Button in _choice_buttons:
-		other.disabled = true
-	button.disabled = false
-	button.add_theme_color_override("font_color", Color("#73e6a8") if correct else Color("#ff9e9e"))
+	button.set_meta("chosen", true)
+	var mark := GOOD_TEXT if correct else ERROR_TEXT
+	button.add_theme_color_override("font_color", mark)
+	button.add_theme_color_override("font_hover_color", mark)
+	button.add_theme_stylebox_override("normal", _row_style(Color("#2a2f3c"), mark))
+	button.add_theme_stylebox_override("hover", _row_style(Color("#2a2f3c"), mark))
 	if correct:
 		_render_code(true)
-		_error_label.text = "Build succeeded. 0 errors."
-		_error_label.add_theme_color_override("font_color", Color("#73e6a8"))
-		_finish_round(true, "Compiled! %s is in scope." % _missing)
+		_error_label.text = "Build succeeded.\n0 errors."
+		_error_label.add_theme_color_override("font_color", GOOD_TEXT)
+		_finish_round(true, "COMPILED!")
 	else:
-		_finish_round(false, "Still broken — you needed  %s" % _correct_line)
+		_show_needed_line()
+		_finish_round(false, "STILL BROKEN!")
+
+
+## After a miss, the terminal shows the line that was needed.
+func _show_needed_line() -> void:
+	_error_label.text = "main.cpp:3: error:\nneeded  %s" % _correct_line
 
 
 func _finish_round(success: bool, message: String) -> void:
 	if _ended:
 		return
 	_ended = true
-	_status_label.text = message
-	_status_label.add_theme_color_override("font_color", Color("#73e6a8") if success else Color("#ff9e9e"))
+	_intro_left = 0.0
+	_update_intro()
+	for other: Button in _choice_buttons:
+		other.disabled = not other.has_meta("chosen")
+	_overlay.pop(("✓ " if success else "✗ ") + message, GOOD_TEXT if success else Color("#ff9e9e"), 42)
 	round_completed.emit(success)
-
-
-func _panel_style(background: Color, border: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	style.content_margin_left = 18
-	style.content_margin_right = 18
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	return style

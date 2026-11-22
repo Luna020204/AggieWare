@@ -32,10 +32,11 @@ func _run() -> void:
 
 ## Luna's native games: latest reviewed revision of the preserved files and
 ## the games that open with a walk-in intro. Update both when a native game
-## is redesigned (PR #17 added the Microscope lab walk-in).
-const NATIVE_REVISION := "f4b2ac5"
-const NATIVE_FILE_COUNT := 89
-const WALK_IN_IDS: Array[String] = ["swipe", "awake", "microscope"]
+## is redesigned (PR #17 added the Microscope lab walk-in, PR #18 the
+## Variable Not in Scope laptop scene and AggieMono font).
+const NATIVE_REVISION := "5610ac7"
+const NATIVE_FILE_COUNT := 97
+const WALK_IN_IDS: Array[String] = ["swipe", "awake", "microscope", "scope"]
 
 func _test_native_preservation() -> void:
 	var path := "res://tools/fixtures/pr16_native_sha256.json"

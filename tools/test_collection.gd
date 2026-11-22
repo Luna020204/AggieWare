@@ -320,7 +320,7 @@ func _test_native_host_lifecycle() -> void:
 		flow._hud._process(0.0)
 		_check(not flow._hud.visible and native.show_internal_timer, kind + " retains its native timer without a duplicate host timer")
 		var full: float = session.get_round_seconds()
-		var has_intro := kind in ["swipe_card", "stay_awake", "microscope"]
+		var has_intro := kind in ["swipe_card", "stay_awake", "microscope", "variable_scope"]
 		_check(is_equal_approx(session.get_intro_seconds(), 3.2 if has_intro else 0.0) and session.is_playing() != has_intro, kind + " retains its authored intro policy")
 		DRIVER.skip_intro(session)
 		_tick_game(session, 0.1)
@@ -386,8 +386,10 @@ func _check_scope_font(hosted: Variant, context: String) -> void:
 	standalone.set_process(false)
 	var actual: Font = hosted._choice_buttons[0].get_theme_font("font")
 	var expected: Font = standalone._choice_buttons[0].get_theme_font("font")
-	_check(actual is SystemFont and expected is SystemFont and actual.font_names == expected.font_names and actual.resource_path != "res://assets/fonts/aggie_pixel.fnt", context + " preserves Scope's case-sensitive standalone choice font")
-	_check(hosted._code_label.get_theme_font("normal_font") is SystemFont, context + " preserves the monospace code font")
+	# PR #18: Scope uses AggieMono, a pixel monospace font with lower case,
+	# because `int y` vs `int Y` must stay distinguishable.
+	_check(actual == expected and actual.resource_path == "res://assets/fonts/aggie_mono.fnt" and actual.resource_path != "res://assets/fonts/aggie_pixel.fnt", context + " preserves Scope's case-sensitive standalone choice font")
+	_check(hosted._code_label.get_theme_font("normal_font").resource_path == "res://assets/fonts/aggie_mono.fnt", context + " preserves the monospace code font")
 	for field: String in ["_status_label", "_timer_label"]:
 		var label: Label = hosted.get(field)
 		var raw: Label = standalone.get(field)

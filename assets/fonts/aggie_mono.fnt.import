@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://bpb8conwurku2"
+path="res://.godot/imported/aggie_mono.fnt-83260be84cbf49866ba043cbc37f23e2.fontdata"
+
+[deps]
+
+source_file="res://assets/fonts/aggie_mono.fnt"
+dest_files=["res://.godot/imported/aggie_mono.fnt-83260be84cbf49866ba043cbc37f23e2.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2
