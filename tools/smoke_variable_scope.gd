@@ -46,8 +46,23 @@ func _run() -> void:
 	_assert(durations[0] > durations[1] and durations[1] > durations[2], "time does not shrink with difficulty: %s" % [durations])
 	_assert(durations[0] <= 10.0 and durations[2] >= 5.0, "durations outside 5-10 s: %s" % [durations])
 
+	# The intro holds the timer and covers the laptop; a click skips it
+	# instead of picking a line.
+	var game := await _spawn(1, false)
+	var intro_results: Array = []
+	game.round_completed.connect(func(s: bool) -> void: intro_results.append(s))
+	var full: float = game._seconds_left
+	for i: int in 5:
+		await process_frame
+	_assert(game._seconds_left == full and game._overlay.intro.visible, "timer ran during the intro")
+	_assert(game._walk_in.scene.visible and game._walk_in.walker.visible, "intro does not show the building and the student")
+	await _click(game._choice_buttons[0].get_global_rect().get_center())
+	_assert(game._intro_left == 0.0 and not game._overlay.intro.visible, "a click did not skip the intro")
+	_assert(intro_results.is_empty(), "a click during the intro picked a line")
+	game.queue_free()
+
 	# Correct click wins, via a real mouse event through the viewport.
-	var game := await _spawn(1)
+	game = await _spawn(1)
 	var results: Array = []
 	game.round_completed.connect(func(s: bool) -> void: results.append(s))
 	var correct_button: Button
@@ -111,11 +126,13 @@ func _run() -> void:
 	quit(1 if _failed else 0)
 
 
-func _spawn(difficulty: int) -> Control:
+func _spawn(difficulty: int, skip_intro: bool = true) -> Control:
 	var game: Control = load(SCENE).instantiate()
 	game.set("difficulty", difficulty)
 	root.add_child(game)
 	await process_frame
+	if skip_intro:
+		game.skip_intro()
 	return game
 
 
