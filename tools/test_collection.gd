@@ -223,6 +223,7 @@ func _test_individual_mechanics() -> void:
 			focus._process(0.01)
 		_check(focus._ended and focus._missed == focus.MISS_LIMITS[focus.difficulty], "Focus loses at its distraction limit")
 		await _dispose(focus)
+	await _test_focus_ramp()
 	var gates: Variant = _mount_game("gates")
 	if gates != null:
 		for card: Button in gates._cards:
@@ -233,6 +234,24 @@ func _test_individual_mechanics() -> void:
 		_win_gates(gates)
 		_check(gates._ended, "Matching gate and inputs completes the circuit")
 		await _dispose(gates)
+
+func _test_focus_ramp() -> void:
+	for difficulty: int in 3:
+		var game: Variant = _mount_game("stay_focused", true, 0.0, difficulty)
+		if game == null:
+			continue
+		var spawns := [0, 0, 0]
+		var step: float = game.get_round_duration() / 180.0
+		for tick: int in 180:
+			_tick_game(game, step)
+			spawns[tick / 60] += game._thoughts.size()
+			# Clear each spawn so this measures pacing without a random miss ending the round.
+			for thought: Control in game._thoughts.duplicate():
+				game._remove_thought(thought)
+		_check(spawns[2] > spawns[0], "Focus difficulty %d spawns more thoughts in the last third (%d) than the first (%d)" % [difficulty, spawns[2], spawns[0]])
+		_tick_game(game, 0.01)
+		_check(game._ended and game._missed == 0, "Focus difficulty %d completes at its standard duration without artificial misses" % difficulty)
+		await _dispose(game)
 
 func _test_week_flow() -> void:
 	var flow: Variant = _mount_flow()

@@ -4,12 +4,14 @@ extends "res://scripts/core/microgame_base.gd"
 const UI := preload("res://scripts/ui/microgame_ui.gd")
 const DURATIONS: Array[float] = [9.0, 8.0, 7.0]
 const SPAWN_INTERVALS: Array[float] = [1.3, 0.95, 0.7]
+const END_INTERVAL_RATIO := 0.65
 const SPEEDS: Array[float] = [210.0, 275.0, 335.0]
 const MISS_LIMITS: Array[int] = [4, 3, 2]
 const THOUGHTS: Array[String] = ["PHONE", "SNACK", "SOCIAL MEDIA", "NAP", "TEXTS"]
 const MAX_STEP := 1.0 / 120.0
 
 var _spawn_clock := 0.0
+var _game_elapsed := 0.0
 var _blocked := 0
 var _missed := 0
 var _shield: Control
@@ -40,10 +42,14 @@ func _update_game(delta: float) -> void:
 	while remaining > 0.0 and not _ended:
 		var step := minf(remaining, MAX_STEP)
 		remaining -= step
+		_game_elapsed += step
 		_shield.position.x = clampf(_shield.position.x + direction * 650.0 * step, 30.0, 1080.0)
 		_spawn_clock += step
-		while _spawn_clock >= SPAWN_INTERVALS[difficulty]:
-			_spawn_clock -= SPAWN_INTERVALS[difficulty]
+		# More distractions arrive as the exam runs out, at every difficulty.
+		var progress := clampf(_game_elapsed / _round_seconds, 0.0, 1.0)
+		var interval := SPAWN_INTERVALS[difficulty] * lerpf(1.0, END_INTERVAL_RATIO, progress)
+		while _spawn_clock >= interval:
+			_spawn_clock -= interval
 			_spawn_thought()
 		for thought: Control in _thoughts.duplicate():
 			var velocity: Vector2 = thought.get_meta("velocity")
@@ -111,6 +117,7 @@ func _reset_game() -> void:
 	_blocked = 0
 	_missed = 0
 	_spawn_clock = 0.0
+	_game_elapsed = 0.0
 	_shield.position = Vector2(555, 550)
 	UI.set_status(_status_label, "")
 	_update_status()
