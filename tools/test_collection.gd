@@ -135,6 +135,8 @@ func _wait_result(flow: Variant) -> void:
 	if flow.state == flow.FlowState.RESULT and is_instance_valid(flow._active_scene):
 		_tick_game(flow._active_scene, 1.5)
 	await process_frame
+	if flow.state == flow.FlowState.TUTORIAL_RESULT:
+		flow._continue_after_life_lesson()
 
 func _finish_bike(flow: Variant) -> void:
 	if not _check(flow.state == flow.FlowState.TRANSITION, "Bike transition is present"):
@@ -318,7 +320,7 @@ func _test_custom_scene_instruction() -> void:
 		flow.week_plan.stages[0].games[0].scene_path = scene_path
 		flow._start_stage(0)
 		var game: Variant = flow._active_scene
-		_check(game.instruction_text == instruction and game._intro_view.instruction_label.text == instruction, "WeekPlan preserves scene-authored instructions when the scene is absent from the debug catalog")
+		_check(game.instruction_text == instruction and game._intro_view.instruction_label.text.begins_with(instruction), "WeekPlan preserves scene-authored instructions when the scene is absent from the debug catalog")
 		await _dispose(flow)
 	_check(DirAccess.remove_absolute(ProjectSettings.globalize_path(scene_path)) == OK, "Remove the temporary custom microgame fixture")
 

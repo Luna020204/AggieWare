@@ -69,7 +69,9 @@ func _accessibility_options() -> void:
 	game._process(0.1)
 	_assert(flow.state == flow.FlowState.RESULT, "result remains until its configured duration")
 	game._process(0.11)
-	_assert(flow.state == flow.FlowState.TRANSITION, "result completion advances the host")
+	_assert(flow.state == flow.FlowState.TUTORIAL_RESULT, "Monday result opens the life lesson")
+	flow._continue_after_life_lesson()
+	_assert(flow.state == flow.FlowState.TRANSITION, "Acknowledging the life lesson advances the host")
 
 	# Turning symbols off still preserves mandatory text and its presentation time.
 	_gs().set_setting(&"result_cues", false)

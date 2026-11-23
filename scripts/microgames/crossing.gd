@@ -20,6 +20,16 @@ var _hud_art: Control
 var _retry_button: Button
 var _level_error := ""
 
+func get_tutorial_instruction() -> String:
+	return _movement_hint() + "\nDodge traffic and reach the flag.\nFinish before TIME reaches zero."
+
+func _movement_hint() -> String:
+	return "MOVE: %s / %s / %s / %s" % [
+		InputActions.action_label(InputActions.ACTION_UP),
+		InputActions.action_label(InputActions.ACTION_DOWN),
+		InputActions.action_label(InputActions.ACTION_LEFT),
+		InputActions.action_label(InputActions.ACTION_RIGHT)]
+
 func get_round_seconds() -> float:
 	return DURATIONS[clampi(difficulty, 0, 2)]
 
@@ -80,6 +90,7 @@ func _build_ui() -> void:
 func _reset_game() -> void:
 	_play_hud.hide()
 	_retry_button.hide()
+	set_tutorial_hint(_movement_hint() + " - REACH THE FLAG")
 	if is_instance_valid(level_node):
 		var errors := level_node.validate_scene()
 		_level_error = "\n".join(errors)
