@@ -9,6 +9,12 @@ extends Control
 signal transition_finished(next_scene_path: String)
 
 const UI := preload("res://scripts/ui/microgame_ui.gd")
+const MAX_STEP := 1.0 / 120.0
+const OBSTACLE_SPEED := 420.0
+const STUMBLE_SECONDS := 0.45
+const OBSTACLE_TIMES: Array[float] = [0.0, 1.15, 1.15]
+const OBSTACLE_LANES: Array[int] = [1, 0, 2]
+const OBSTACLE_NAMES: Array[String] = ["SCOOTER", "BIKE", "WALKER"]
 
 @export var next_prompt: String = "CANVAS"
 @export_range(1.0, 10.0, 0.5) var transition_duration: float = 3.0
@@ -21,11 +27,16 @@ const UI := preload("res://scripts/ui/microgame_ui.gd")
 var _elapsed := 0.0
 var _current_lane := 1
 var _finished := false
+var _next_obstacle := 0
+var _stumble_left := 0.0
+var _stumbles := 0
+var _obstacles: Array[PanelContainer] = []
 var _bike: PanelContainer
 var _progress: ProgressBar
 var _status_label: Label
 var _lives_label: Label
 var _score_label: Label
+var _goal_label: Label
 
 const TRACK_RECT := Rect2(120.0, 205.0, 1040.0, 300.0)
 const LANE_Y := [245.0, 350.0, 455.0]
@@ -44,12 +55,26 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _finished or not is_inside_tree() or get_tree().paused:
 		return
-	_elapsed += maxf(delta, 0.0)
-	var fraction := clampf(_elapsed / maxf(transition_duration, 0.001), 0.0, 1.0)
-	_progress.value = fraction * 100.0
-	_bike.position.x = TRACK_RECT.position.x + 34.0 + fraction * (TRACK_RECT.size.x - 110.0)
-	if auto_advance and _elapsed >= transition_duration:
-		_finish_transition()
+	var remaining := maxf(delta, 0.0)
+	while remaining > 0.0 and not _finished:
+		var step := minf(remaining, MAX_STEP)
+		remaining -= step
+		if _stumble_left > 0.0:
+			_stumble_left = maxf(0.0, _stumble_left - step)
+			if _stumble_left == 0.0:
+				_bike.modulate = Color.WHITE
+				_status_label.text = "KEEP DODGING!  STUMBLES: %d" % _stumbles
+		else:
+			_elapsed += step
+			var fraction := clampf(_elapsed / maxf(transition_duration, 0.001), 0.0, 1.0)
+			_progress.value = fraction * 100.0
+			_bike.position.x = TRACK_RECT.position.x + 34.0 + fraction * (TRACK_RECT.size.x - 110.0)
+			_spawn_due_obstacles()
+		_move_obstacles(step)
+		if _stumble_left <= 0.0:
+			_check_obstacle_hits()
+		if auto_advance and _elapsed >= transition_duration:
+			_finish_transition()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -60,8 +85,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_set_lane(_current_lane - 1)
 	elif event.is_action_pressed(InputActions.ACTION_DOWN):
 		_set_lane(_current_lane + 1)
-	elif event.is_action_pressed(InputActions.ACTION_CONFIRM):
-		_finish_transition()
 	else:
 		return
 	viewport.set_input_as_handled()
@@ -109,6 +132,15 @@ func _build_ui() -> void:
 	UI.shadow(next_label, 28)
 	next_label.add_theme_color_override("font_color", Color("#73b7ff"))
 	add_child(next_label)
+	_goal_label = Label.new()
+	_goal_label.position = Vector2(0.0, 165.0)
+	_goal_label.size = Vector2(1280.0, 38.0)
+	_goal_label.text = "DODGE THE TRAFFIC  ·  UP / DOWN TO CHANGE LANES"
+	_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_goal_label.add_theme_font_size_override("font_size", 23)
+	UI.shadow(_goal_label, 23)
+	_goal_label.add_theme_color_override("font_color", Color("#ffbf00"))
+	add_child(_goal_label)
 
 	var track := PanelContainer.new()
 	track.position = TRACK_RECT.position
@@ -127,6 +159,7 @@ func _build_ui() -> void:
 
 	_bike = PanelContainer.new()
 	_bike.size = Vector2(82.0, 54.0)
+	_bike.z_index = 2
 	_bike.add_theme_stylebox_override("panel", _panel_style(Color("#d8753d"), Color("#ffcc66")))
 	add_child(_bike)
 	var bike_label := Label.new()
@@ -156,17 +189,70 @@ func _reset_transition() -> void:
 	_elapsed = 0.0
 	_finished = false
 	_current_lane = 1
+	_next_obstacle = 0
+	_stumble_left = 0.0
+	_stumbles = 0
+	_bike.modulate = Color.WHITE
+	for obstacle: PanelContainer in _obstacles:
+		remove_child(obstacle)
+		obstacle.queue_free()
+	_obstacles.clear()
 	_progress.value = 0.0
 	_lives_label.text = "Lives: %d" % lives
 	_score_label.text = "Score: %d" % score
+	_bike.position.x = TRACK_RECT.position.x + 34.0
 	_set_lane(_current_lane)
-	_status_label.text = "Use Up / Down to choose your lane · Confirm to skip"
+	_status_label.text = "Avoid a stumble on the way to class."
+	_spawn_due_obstacles()
 
 
 func _set_lane(lane: int) -> void:
 	_current_lane = clampi(lane, 0, LANE_Y.size() - 1)
 	_bike.position = Vector2(_bike.position.x, LANE_Y[_current_lane])
-	_status_label.text = "Riding to the next activity..."
+
+
+func _spawn_due_obstacles() -> void:
+	while _next_obstacle < OBSTACLE_TIMES.size() and _elapsed >= OBSTACLE_TIMES[_next_obstacle]:
+		var index := _next_obstacle
+		_next_obstacle += 1
+		var obstacle := PanelContainer.new()
+		obstacle.size = Vector2(110.0, 54.0)
+		obstacle.position = Vector2(TRACK_RECT.end.x - 120.0, LANE_Y[OBSTACLE_LANES[index]])
+		obstacle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		obstacle.add_theme_stylebox_override("panel", _panel_style(Color("#7b3441"), Color("#ffbf00")))
+		var label := Label.new()
+		label.text = OBSTACLE_NAMES[index]
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.add_theme_color_override("font_color", Color.WHITE)
+		obstacle.add_child(label)
+		add_child(obstacle)
+		_obstacles.append(obstacle)
+
+
+func _move_obstacles(delta: float) -> void:
+	for obstacle: PanelContainer in _obstacles.duplicate():
+		obstacle.position.x -= OBSTACLE_SPEED * delta
+		if obstacle.position.x + obstacle.size.x < TRACK_RECT.position.x:
+			_remove_obstacle(obstacle)
+
+
+func _check_obstacle_hits() -> void:
+	var bike_rect := Rect2(_bike.position, _bike.size)
+	for obstacle: PanelContainer in _obstacles.duplicate():
+		if bike_rect.intersects(Rect2(obstacle.position, obstacle.size)):
+			_remove_obstacle(obstacle)
+			_stumbles += 1
+			_stumble_left = STUMBLE_SECONDS
+			_bike.modulate = Color("#ff9e9e")
+			_status_label.text = "STUMBLE! +%.2f s delay  ·  HITS: %d" % [STUMBLE_SECONDS, _stumbles]
+			break
+
+
+func _remove_obstacle(obstacle: PanelContainer) -> void:
+	_obstacles.erase(obstacle)
+	remove_child(obstacle)
+	obstacle.queue_free()
 
 
 func _finish_transition() -> void:

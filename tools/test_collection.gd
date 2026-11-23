@@ -41,6 +41,7 @@ func _run_suite(thorough: bool) -> void:
 	await _test_failure_and_stale_callbacks()
 	if thorough:
 		await _test_crossing_pause_and_collision()
+		await _test_bike_obstacles()
 	print("Collection checks: %d; failures: %d" % [checks, failures])
 	if failures == 0:
 		print("COLLECTION_TESTS_OK" if thorough else "FLOW_SMOKE_OK")
@@ -501,6 +502,38 @@ func _test_crossing_pause_and_collision() -> void:
 	game._process(0.2)
 	_check(game.simulation.state == "crashed" and game._ended and outcomes == [false], "Traffic collision reports exactly one loss to the host contract")
 	await _dispose(game)
+
+func _test_bike_obstacles() -> void:
+	var packed: PackedScene = load("res://scenes/core/bike_transition.tscn")
+	if not _check(packed != null, "Load bike transition with obstacles"):
+		return
+	var dodge: Variant = packed.instantiate()
+	dodge.managed_by_flow = true
+	root.add_child(dodge)
+	dodge.set_process(false)
+	_check(dodge._obstacles.size() == 1 and dodge._goal_label.text.contains("DODGE") and dodge._goal_label.text.contains("UP / DOWN"), "Bike begins with a visible obstacle and goal")
+	dodge._set_lane(2)
+	dodge._process(1.5)
+	_check(dodge._stumbles == 0 and dodge._obstacles.size() == 3, "Switching lanes dodges the first scooter (hits %d, obstacles %d)" % [dodge._stumbles, dodge._obstacles.size()])
+	dodge._set_lane(1)
+	dodge._process(1.5)
+	dodge._process(0.01)
+	_check(dodge._stumbles == 0 and dodge._finished, "Switching back dodges the paired obstacles and reaches class (hits %d, finished %s)" % [dodge._stumbles, str(dodge._finished)])
+	await _dispose(dodge)
+	var hit: Variant = packed.instantiate()
+	hit.managed_by_flow = true
+	root.add_child(hit)
+	hit.set_process(false)
+	var finishes: Array[String] = []
+	hit.transition_finished.connect(func(path: String) -> void: finishes.append(path))
+	hit._process(1.4)
+	_check(hit._stumbles == 1 and hit._stumble_left > 0.0 and hit._status_label.text.contains("STUMBLE") and hit._bike.modulate != Color.WHITE, "Hitting a scooter visibly stumbles the bike once")
+	var elapsed: float = hit._elapsed
+	hit._process(0.1)
+	_check(is_equal_approx(hit._elapsed, elapsed), "Stumble delays arrival progress")
+	hit._process(4.0)
+	_check(hit._finished and finishes.size() == 1 and hit.lives == 3 and hit.score == 0, "Bike completes once after the stumble without changing round lives or score")
+	await _dispose(hit)
 
 func _win_game(kind: String, session: Variant) -> void:
 	var game: Variant = _game_body(session)
