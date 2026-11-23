@@ -180,3 +180,9 @@ godot --headless --editor --path . scenes/crossing/campus_intro.tscn -- --test-n
 The [original collection README](docs/AGGIEWARE_ORIGINAL_README.md), [Hongrui's technical record](docs/individual-technical-record-hongrui.md), and [vertical-slice checkpoint](docs/SCRUM-52-vertical-slice-checkpoint.md) are preserved as historical records. This README describes the current implementation.
 
 The checked-in generators create the AggiePixel font and Luna's Swipe Card and Stay Awake sprites. The framework environments use procedural pixel drawing. Campus Crossing layouts are fictional. Record sources and licenses when adding outside assets.
+
+## Monday onboarding (SCRUM-42)
+
+Monday waits for **I'M READY** before the timer starts, teaches Canvas drag/submit
+and Crossing movement, and explains the first life lost. See
+[onboarding behavior and validation](docs/SCRUM-42-onboarding.md).

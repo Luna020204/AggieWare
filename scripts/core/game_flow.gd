@@ -7,7 +7,7 @@ signal microgame_requested(stage_index: int)
 signal stage_cleared(stage_index: int)
 signal game_over
 
-enum FlowState { TITLE, STAGE_SELECT, PLAYING, RESULT, TRANSITION, STAGE_CLEAR, GAME_OVER }
+enum FlowState { TITLE, STAGE_SELECT, PLAYING, RESULT, TRANSITION, STAGE_CLEAR, GAME_OVER, TUTORIAL_RESULT }
 
 const BIKE_SCENE := preload("res://scenes/core/bike_transition.tscn")
 const HUD_SCENE := preload("res://scenes/ui/game_hud.tscn")
@@ -36,6 +36,7 @@ var _pending_stage := 0
 var _pending_round := 0
 var _run_token := 0
 var _round_success := false
+var _explained_life_loss := false
 
 
 func _ready() -> void:
@@ -71,6 +72,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_show_stage_select()
 			FlowState.STAGE_CLEAR:
 				_advance_after_clear()
+			FlowState.TUTORIAL_RESULT:
+				_continue_after_life_lesson()
 			FlowState.GAME_OVER:
 				_retry_stage()
 			_:
@@ -145,6 +148,7 @@ func _show_stage_select() -> void:
 	if starting_week:
 		lives = 3
 		score = 0
+		_explained_life_loss = false
 	state = FlowState.STAGE_SELECT
 	_header_label.text = "SELECT A DAY"
 	_subtitle_label.text = "Choose where your week begins"
@@ -192,6 +196,8 @@ func _start_round(stage_index: int, round_index: int) -> void:
 				microgame.set("duration_override", definition.round_seconds_override)
 			else:
 				push_warning("Microgame does not support a duration override: " + definition.scene_path)
+	if microgame is MicrogameBase:
+		microgame.tutorial_enabled = definition.tutorial_enabled
 	microgame.result_seconds = result_delay
 	microgame.round_completed.connect(_on_round_completed.bind(_run_token))
 	microgame.time_changed.connect(_on_round_time_changed.bind(_run_token))
@@ -244,12 +250,37 @@ func _on_round_completed(success: bool, token: int = -1) -> void:
 func _on_result_finished(token: int = -1) -> void:
 	if state != FlowState.RESULT or (token != -1 and token != _run_token):
 		return
+	if not _round_success and not _explained_life_loss and week_plan.stages[current_stage].games[current_round].tutorial_enabled:
+		_explained_life_loss = true
+		_show_life_lesson()
+		return
 	if _round_success:
 		if current_round + 1 < week_plan.stages[current_stage].games.size():
 			_begin_transition(current_stage, current_round + 1)
 		else:
 			show_stage_clear(current_stage + 1)
 	elif lives <= 0:
+		show_game_over()
+	else:
+		_begin_transition(current_stage, current_round)
+
+
+func _show_life_lesson() -> void:
+	_clear_active_scene()
+	state = FlowState.TUTORIAL_RESULT
+	_center.show()
+	_header_label.text = "ONE LIFE LOST"
+	_subtitle_label.text = "%d %s remaining" % [lives, "life" if lives == 1 else "lives"]
+	_clear_content()
+	_add_message("A failed round costs one life. At zero, retry the day.")
+	_add_message("You can try this round again." if lives > 0 else "Let's start the day again.")
+	_add_button("Continue", _continue_after_life_lesson).grab_focus()
+
+
+func _continue_after_life_lesson() -> void:
+	if state != FlowState.TUTORIAL_RESULT or get_tree().paused:
+		return
+	if lives <= 0:
 		show_game_over()
 	else:
 		_begin_transition(current_stage, current_round)

@@ -140,6 +140,7 @@ func _draw_file(card: Control) -> void:
 
 func _reset_game() -> void:
 	_drag.cancel()
+	set_tutorial_hint("1. DRAG FILE.ZIP TO THE UPLOAD AREA")
 	_placed_file = null
 	_zone_clock = 0.0
 	_submit_clock = 0.0
@@ -198,6 +199,7 @@ func _on_file_dropped(card: Control) -> void:
 			CardDrag.center_on(card, _drop_zone)
 			card.z_index = 5
 			_drop_zone_label.text = "FILE ATTACHED"
+			set_tutorial_hint("2. CLICK SUBMIT ASSIGNMENT")
 		else:
 			show_feedback("WRONG FILE!", UI.REJECT)
 			card.position = card.get_meta("origin")

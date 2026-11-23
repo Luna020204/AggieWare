@@ -7,6 +7,7 @@
 [sub_resource type="Resource" id="Game_monday_canvas"]
 script = ExtResource("3_game")
 id = &"canvas"
+tutorial_enabled = true
 title = "Canvas Upload"
 prompt = "UPLOAD"
 scene_path = "res://scenes/microgames/canvas.tscn"
@@ -15,6 +16,7 @@ difficulty = 0
 [sub_resource type="Resource" id="Game_crossing"]
 script = ExtResource("3_game")
 id = &"crossing"
+tutorial_enabled = true
 title = "Campus Crossing"
 prompt = "CROSS"
 scene_path = "res://scenes/microgames/crossing.tscn"

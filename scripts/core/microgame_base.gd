@@ -10,6 +10,10 @@ signal result_finished
 
 @export_range(0, 2, 1) var difficulty := 0
 @export var managed_by_flow := false
+@export var tutorial_enabled := false
+var _waiting_for_ready := false
+var _tutorial_hint: Label
+var _ready_button: Button
 @export var show_internal_timer := true
 @export var prompt := "PLAY"
 @export var game_title := ""
@@ -58,6 +62,8 @@ func _process(delta: float) -> void:
 				_result_emitted = true
 				result_finished.emit()
 		return
+	if _waiting_for_ready:
+		return
 	if _prompt_left > 0.0:
 		_prompt_left = maxf(0.0, _prompt_left - delta)
 		var elapsed := _intro_duration - _prompt_left
@@ -88,6 +94,11 @@ func _start_round() -> void:
 	_seconds_left = _round_seconds
 	_ended = false
 	_playing_started = false
+	_waiting_for_ready = tutorial_enabled
+	if is_instance_valid(_ready_button):
+		_ready_button.visible = tutorial_enabled
+		if tutorial_enabled: _ready_button.grab_focus()
+	if is_instance_valid(_tutorial_hint): _tutorial_hint.hide()
 	_result_emitted = false
 	_result_left = 0.0
 	_feedback_left = 0.0
@@ -101,14 +112,17 @@ func _start_round() -> void:
 	_reset_game()
 	_update_intro_progress(0.0, _intro_duration)
 	_intro_view.title_label.text = game_title if not game_title.is_empty() else prompt
-	_intro_view.instruction_label.text = instruction_text
-	_intro_view.visible = not _ended and _prompt_left > 0.0
+	_intro_view.instruction_label.text = get_tutorial_instruction() if tutorial_enabled else instruction_text
+	_intro_view.visible = not _ended and (_waiting_for_ready or _prompt_left > 0.0)
 	time_changed.emit(_seconds_left, _round_seconds)
 	_update_internal_timer()
-	if not _ended and _prompt_left <= 0.0: _begin_play()
+	if not _ended and not _waiting_for_ready and _prompt_left <= 0.0: _begin_play()
 
 func _begin_play() -> void:
 	if _playing_started or _ended: return
+	_waiting_for_ready = false
+	if is_instance_valid(_ready_button): _ready_button.hide()
+	if is_instance_valid(_tutorial_hint): _tutorial_hint.show()
 	_playing_started = true
 	_prompt_left = 0.0
 	_intro_view.hide()
@@ -117,11 +131,13 @@ func _begin_play() -> void:
 	Accessibility.begin_microgame(playback_speed, self)
 
 func skip_intro() -> void:
-	if not _ended and not get_tree().paused and _prompt_left > 0.0: _begin_play()
+	if not _ended and not get_tree().paused and (_waiting_for_ready or _prompt_left > 0.0): _begin_play()
 
 func _finish_round(success: bool, message: String) -> void:
 	if _ended: return
 	_ended = true
+	_waiting_for_ready = false
+	if is_instance_valid(_tutorial_hint): _tutorial_hint.hide()
 	_prompt_left = 0.0
 	_result_left = maxf(result_seconds, 0.0)
 	_feedback_left = 0.0
@@ -148,6 +164,12 @@ func show_feedback(message: String, color: Color = PresentationUI.REJECT, durati
 
 func can_interact() -> bool:
 	return is_inside_tree() and not get_tree().paused and not _ended and _playing_started and _prompt_left <= 0.0 and _seconds_left > 0.0
+
+func get_tutorial_instruction() -> String:
+	return instruction_text + "\nFinish before TIME reaches zero.\nA failed round costs one life."
+
+func set_tutorial_hint(text: String) -> void:
+	if is_instance_valid(_tutorial_hint): _tutorial_hint.text = text
 
 func get_seconds_left() -> float: return _seconds_left
 func get_round_duration() -> float: return _round_seconds
@@ -182,9 +204,26 @@ func _build_presentations() -> void:
 	_prompt_layer.add_child(_intro_view)
 	_intro_view.finished.connect(skip_intro)
 	_intro_view.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed and not get_tree().paused:
+		if not tutorial_enabled and event is InputEventMouseButton and event.pressed and not get_tree().paused:
 			skip_intro()
 			get_viewport().set_input_as_handled())
+	if tutorial_enabled:
+		_intro_view.instruction_label.size.y = 160
+		_ready_button = Button.new()
+		_ready_button.name = "TutorialReady"
+		_ready_button.text = "I'M READY"
+		_ready_button.position = Vector2(440, 540)
+		_ready_button.size = Vector2(400, 65)
+		_intro_view.add_child(_ready_button)
+		_ready_button.pressed.connect(skip_intro)
+		_tutorial_hint = PresentationUI.label(_prompt_layer, "", Vector2(30, 670), 21,
+			PresentationUI.TEXT, Vector2(1220, 40))
+		_tutorial_hint.name = "TutorialHint"
+		_tutorial_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var hint_style := StyleBoxFlat.new()
+		hint_style.bg_color = Color(0.02, 0.06, 0.12, 0.95)
+		_tutorial_hint.add_theme_stylebox_override("normal", hint_style)
+		_tutorial_hint.hide()
 	_feedback_view = ResultPresentation.new()
 	_feedback_view.name = "ActionFeedback"
 	_prompt_layer.add_child(_feedback_view)
