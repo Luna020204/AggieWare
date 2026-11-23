@@ -6,9 +6,15 @@ const OPEN_DELAY := 1.5
 const WINDOWS: Array[float] = [7.5, 6.5, 5.5]
 const CLASS_NAMES: Array[String] = ["ECS 179", "MAT 21D", "UWP 101", "ECS 140A", "STA 100"]
 const SLOTS: Array[Vector2] = [
-	Vector2(115, 265), Vector2(480, 265), Vector2(845, 265),
-	Vector2(300, 390), Vector2(665, 390),
+	Vector2(50, 300), Vector2(50, 365), Vector2(50, 430),
+	Vector2(50, 495), Vector2(50, 560),
 ]
+const NAVY := Color("022851")
+const BLUE := Color("31577d")
+const GOLD := Color("e8b923")
+const CREAM := Color("fff8e6")
+const INK := Color("173956")
+const MUTED_INK := Color("526678")
 
 var _registered := 0
 var _shuffle_clock := 0.0
@@ -27,7 +33,6 @@ func get_round_seconds() -> float:
 
 func _update_game(delta: float) -> void:
 	_timer_label.text = "TIME %.1f" % _seconds_left
-	_art.queue_redraw()
 	var registration_window := maxf(_round_seconds - OPEN_DELAY, 0.0)
 	if _seconds_left > registration_window:
 		_clock_label.text = "PASS TIME  7:59 AM"
@@ -45,31 +50,66 @@ func _update_game(delta: float) -> void:
 
 func _build_ui() -> void:
 	_rng.randomize()
-	UI.add_backdrop(self, "campus")
 	_art = UI.pixel_canvas(self, _draw_world)
 	var header := UI.build_header(self, "SCHEDULE BUILDER", "WAIT FOR 8:00, THEN REGISTER.", show_internal_timer)
 	_timer_label = header.timer
-	_clock_label = UI.label(self, "", Vector2(30, 65), 14, UI.TEXT, Vector2(400, 20))
-	_progress_label = UI.label(self, "", Vector2(30, 85), 14, UI.TEXT, Vector2(400, 20))
-	UI.label(self, "REGISTRAR", Vector2(145, 195), 28, UI.GOLD, Vector2(900, 40))
+	UI.label(self, "myucdavis", Vector2(260, 18), 21, UI.ACCENT, Vector2(190, 30))
+	UI.label(self, "ACADEMICS", Vector2(485, 18), 14, UI.TEXT, Vector2(150, 30))
+	UI.label(self, "STUDENT LIFE", Vector2(675, 18), 14, UI.TEXT, Vector2(190, 30))
+	UI.label(self, "My Schedule", Vector2(45, 75), 28, INK, Vector2(320, 35))
+	UI.label(self, "ADD / SEARCH COURSES", Vector2(390, 80), 14, INK, Vector2(270, 25))
+	UI.label(self, "CREATE NEW SCHEDULE", Vector2(690, 80), 14, INK, Vector2(275, 25))
+	UI.label(self, "REGISTER ALL", Vector2(1000, 80), 14, INK, Vector2(200, 25))
+	UI.label(self, "SEARCH FOR COURSES", Vector2(55, 125), 21, INK, Vector2(380, 25))
+	UI.label(self, "CRN, SUBJECT, INSTRUCTOR, OR KEYWORD", Vector2(60, 164), 14, MUTED_INK, Vector2(640, 25))
+	UI.label(self, "SEARCH", Vector2(492, 193), 21, UI.TEXT, Vector2(170, 30))
+	UI.label(self, "SCHEDULE 1", Vector2(65, 245), 21, INK, Vector2(220, 30))
+	_clock_label = UI.label(self, "", Vector2(280, 245), 21, INK, Vector2(300, 30))
+	_progress_label = UI.label(self, "", Vector2(605, 245), 21, INK, Vector2(270, 30))
+	UI.label(self, "SUGGESTED COURSES", Vector2(925, 245), 21, INK, Vector2(310, 30))
+	UI.label(self, "COMPUTER SCIENCE", Vector2(935, 300), 14, INK, Vector2(280, 30))
+	UI.label(self, "PREVIOUSLY SAVED", Vector2(925, 390), 21, INK, Vector2(300, 30))
+	UI.label(self, "COURSE DETAILS", Vector2(935, 450), 14, INK, Vector2(280, 30))
+	UI.label(self, "COURSE SECTIONS", Vector2(935, 500), 14, INK, Vector2(280, 30))
 	_status_label = UI.status_label(self)
+	_art.queue_redraw()
 
 
 func _draw_world() -> void:
-	_art.draw_rect(Rect2(100, 190, 30, 500), Color("664331"))
-	_art.draw_rect(Rect2(1150, 190, 30, 500), Color("664331"))
-	_art.draw_rect(Rect2(80, 175, 1120, 415), Color("674535"))
-	_art.draw_rect(Rect2(95, 190, 1090, 385), Color("a27b4e"))
-	for row in 12:
-		for dot in 27:
-			_art.draw_rect(Rect2(110 + dot * 40 + (row % 2) * 10, 205 + row * 30, 5, 5), Color("947044"))
+	_rect(0, 0, 1280, 720, Color("f6f8fa"))
+	_rect(0, 0, 1280, 55, NAVY)
+	_rect(0, 55, 1280, 60, Color.WHITE)
+	_rect(370, 65, 865, 42, GOLD)
+	_rect(370, 65, 865, 4, Color("f5d675"))
+	for x in [670, 975]:
+		_rect(x, 69, 3, 38, Color("c49018"))
+	_rect(40, 120, 1195, 100, CREAM)
+	_rect(40, 120, 1195, 32, Color("ead59a"))
+	_rect(50, 185, 420, 28, Color.WHITE)
+	_rect(50, 185, 420, 2, Color("bdc8d2"))
+	_rect(475, 185, 160, 28, NAVY)
+	_rect(40, 230, 850, 430, Color("e5eaf0"))
+	_rect(40, 230, 850, 55, Color("ccd5e0"))
+	_rect(910, 230, 325, 145, CREAM)
+	_rect(910, 230, 325, 55, Color("ead59a"))
+	_rect(925, 290, 295, 60, Color.WHITE)
+	_rect(910, 380, 325, 210, CREAM)
+	_rect(910, 380, 325, 55, Color("ead59a"))
+	_rect(925, 440, 295, 130, Color.WHITE)
+	_rect(925, 485, 295, 2, Color("cbd3dd"))
 	for button: Button in _buttons:
-		var paper := Rect2(button.position, button.size)
-		_art.draw_rect(Rect2(paper.position + Vector2(5, 10), paper.size), Color("614839"))
-		_art.draw_rect(paper, Color("b7ccb0") if button.disabled else Color("f1e2b9"))
-		_art.draw_rect(Rect2(paper.position + Vector2(8, 8), Vector2(8, 8)), Color("b45844"))
-		_art.draw_rect(Rect2(paper.position + Vector2(paper.size.x - 16, 8), Vector2(8, 8)), Color("b45844"))
-		_art.draw_rect(Rect2(paper.position + Vector2(15, paper.size.y - 12), Vector2(paper.size.x - 30, 4)), Color("c2ba94"))
+		var box := Rect2(button.position, button.size)
+		_art.draw_rect(Rect2(box.position + Vector2(3, 4), box.size), Color("c2ccd5"))
+		_art.draw_rect(box, Color("e9f4ea") if button.disabled else Color.WHITE)
+		_art.draw_rect(Rect2(box.position, Vector2(box.size.x, 2)), Color("c8d3df"))
+		_art.draw_rect(Rect2(box.position + Vector2(610, 7), Vector2(190, 42)), BLUE if button.disabled else NAVY)
+		_art.draw_rect(Rect2(box.position + Vector2(610, 7), Vector2(190, 3)), Color("6684a0"))
+	_rect(40, 670, 1195, 2, Color("cbd3dd"))
+
+
+func _rect(x: float, y: float, width: float, height: float, color: Color) -> void:
+	_art.draw_rect(Rect2(x, y, width, height), color)
+
 
 func _reset_game() -> void:
 	_registered = 0
@@ -82,17 +122,17 @@ func _reset_game() -> void:
 	_progress_label.text = "REGISTERED  0 / %d" % class_count
 	for index: int in class_count:
 		var button := Button.new()
-		button.text = "%s\nREGISTER" % CLASS_NAMES[index]
 		button.position = SLOTS[index]
-		button.size = Vector2(310, 90)
+		button.size = Vector2(810, 55)
 		button.focus_mode = Control.FOCUS_NONE
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		UI.flat_button(button, 21)
-		button.add_theme_color_override("font_color", Color("263344"))
-		button.add_theme_color_override("font_hover_color", Color("46604b"))
-		button.add_theme_color_override("font_pressed_color", Color("46604b"))
-		button.add_theme_color_override("font_disabled_color", Color("46604b"))
 		button.pressed.connect(_register.bind(index))
 		add_child(button)
+		UI.label(button, CLASS_NAMES[index], Vector2(15, 15), 21, INK, Vector2(210, 30))
+		UI.label(button, "OPEN  /  0 WAITLIST", Vector2(245, 19), 14, MUTED_INK, Vector2(360, 25))
+		var action := UI.label(button, "REGISTER", Vector2(625, 16), 21, UI.TEXT, Vector2(170, 30))
+		action.name = "ActionLabel"
 		_buttons.append(button)
 	_art.queue_redraw()
 
@@ -104,7 +144,8 @@ func _register(index: int) -> void:
 		show_feedback("WAIT UNTIL 8:00!", UI.REJECT)
 		return
 	_buttons[index].disabled = true
-	_buttons[index].text = "%s\nREGISTERED" % CLASS_NAMES[index]
+	var action: Label = _buttons[index].get_node("ActionLabel")
+	action.text = "DONE"
 	_registered += 1
 	_progress_label.text = "REGISTERED  %d / %d" % [_registered, _buttons.size()]
 	_art.queue_redraw()
@@ -126,6 +167,7 @@ func _shuffle_unregistered() -> void:
 		open_slots[swap_index] = saved
 	for item: int in open_indices.size():
 		_buttons[open_indices[item]].position = open_slots[item]
+	_art.queue_redraw()
 
 
 func _on_timeout() -> void:
