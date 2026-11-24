@@ -1,0 +1,85 @@
+extends "res://scripts/core/microgame_base.gd"
+
+const UI := preload("res://scripts/ui/microgame_ui.gd")
+const DURATIONS := [9.0, 8.0, 7.0]
+var _art: Control
+var _timer_label: Label
+var _status_label: Label
+var _elapsed := 0.0
+
+func get_round_seconds() -> float:
+	return DURATIONS[clampi(difficulty, 0, 2)]
+
+func _update_intro_progress(elapsed: float, duration: float) -> void:
+	_status_label.visible = elapsed >= duration
+
+func _show_result(_success: bool, _message: String) -> void:
+	_status_label.hide()
+	_art.queue_redraw()
+
+func _draw_backdrop() -> void:
+	_art.draw_rect(Rect2(0, 0, 1280, 720), Color("101a36"))
+	for i in 45:
+		_art.draw_rect(Rect2((i * 197 + 35) % 1260, (i * 113 + 110) % 620, 5, 5), Color("526582"))
+	_art.draw_rect(Rect2(0, 650, 1280, 70), Color("233956"))
+	for x in range(0, 1280, 80):
+		_art.draw_rect(Rect2(x, 650, 40, 10), UI.GOLD)
+
+func _draw_vessel(at: Vector2) -> void:
+	_art.draw_rect(Rect2(at + Vector2(-40, -10), Vector2(80, 25)), Color("9ad2db"))
+	_art.draw_rect(Rect2(at + Vector2(-20, -25), Vector2(40, 20)), Color("4d8dbb"))
+	_art.draw_rect(Rect2(at + Vector2(-10, -20), Vector2(20, 10)), UI.GOLD)
+	_art.draw_rect(Rect2(at + Vector2(-25, 15), Vector2(15, 15)), Color("f28553"))
+	_art.draw_rect(Rect2(at + Vector2(10, 15), Vector2(15, 15)), Color("f28553"))
+
+const LOCK_SECONDS := 0.65
+const TARGET_SPEEDS := [0.65, 0.9, 1.15]
+var camera := Vector2(270, 460)
+var vessel := Vector2(960, 330)
+var lock_progress := 0.0
+
+func _build_ui() -> void:
+	_art = UI.pixel_canvas(self, _draw_world)
+	_timer_label = UI.build_header(self, "POSITION LOCK", "MOVE FRAME. HOLD VESSEL INSIDE.", show_internal_timer).timer
+	_status_label = UI.label(self, "", Vector2(30, 65), 14, UI.TEXT)
+
+func _reset_game() -> void:
+	_elapsed = 0.0
+	camera = Vector2(270, 460)
+	vessel = Vector2(960, 330)
+	lock_progress = 0.0
+	_update_labels()
+	_art.queue_redraw()
+
+func _update_game(delta: float) -> void:
+	# Substeps require continuous containment, even across a long frame.
+	var remaining := delta
+	while remaining > 0.0 and not _ended:
+		var step := minf(remaining, 1.0 / 120.0)
+		remaining -= step
+		_elapsed += step
+		camera += InputActions.movement_vector() * 680.0 * step
+		camera = camera.clamp(Vector2(100, 190), Vector2(1180, 560))
+		vessel = Vector2(790 + 170 * cos(_elapsed * TARGET_SPEEDS[difficulty]), 330 + 100 * sin(_elapsed * TARGET_SPEEDS[difficulty]))
+		if absf(camera.x - vessel.x) <= 60.0 and absf(camera.y - vessel.y) <= 45.0:
+			lock_progress += step
+		else:
+			lock_progress = 0.0
+		if lock_progress >= LOCK_SECONDS:
+			_finish_round(true, "VESSEL LOCKED!")
+	_update_labels()
+	_art.queue_redraw()
+
+func _update_labels() -> void:
+	_timer_label.text = "TIME %.1f" % _seconds_left
+	_status_label.text = "MOVE %s / %s / %s / %s   LOCK %d%%" % [InputActions.action_label(InputActions.ACTION_UP), InputActions.action_label(InputActions.ACTION_DOWN), InputActions.action_label(InputActions.ACTION_LEFT), InputActions.action_label(InputActions.ACTION_RIGHT), mini(100, int(lock_progress / LOCK_SECONDS * 100))]
+
+func _draw_world() -> void:
+	_draw_backdrop()
+	_draw_vessel(vessel)
+	var color := UI.SUCCESS if lock_progress > 0.0 else UI.GOLD
+	_art.draw_rect(Rect2(camera - Vector2(105, 80), Vector2(210, 160)), color, false, 5)
+	_art.draw_line(camera - Vector2(15, 0), camera + Vector2(15, 0), color, 5)
+	_art.draw_line(camera - Vector2(0, 15), camera + Vector2(0, 15), color, 5)
+	_art.draw_rect(Rect2(camera + Vector2(-100, 95), Vector2(200, 10)), Color("394c68"))
+	_art.draw_rect(Rect2(camera + Vector2(-100, 95), Vector2(200 * minf(lock_progress / LOCK_SECONDS, 1.0), 10)), UI.SUCCESS)

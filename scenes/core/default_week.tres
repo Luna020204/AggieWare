@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="WeekPlan" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="WeekPlan" load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/week_plan.gd" id="1_week"]
 [ext_resource type="Script" path="res://scripts/core/stage_definition.gd" id="2_day"]
@@ -52,6 +52,20 @@ prompt = "SUBMIT"
 scene_path = "res://scenes/microgames/canvas.tscn"
 difficulty = 2
 
+[sub_resource type="Resource" id="Game_position_lock"]
+script = ExtResource("3_game")
+id = &"position_lock"
+title = "Position Lock"
+scene_path = "res://scenes/microgames/position_lock.tscn"
+difficulty = 1
+
+[sub_resource type="Resource" id="Game_shield_break"]
+script = ExtResource("3_game")
+id = &"shield_break"
+title = "Shield Break"
+scene_path = "res://scenes/microgames/shield_break.tscn"
+difficulty = 1
+
 [sub_resource type="Resource" id="Day_monday"]
 script = ExtResource("2_day")
 title = "MONDAY"
@@ -75,7 +89,7 @@ games = Array[ExtResource("3_game")]([SubResource("Game_gates")])
 [sub_resource type="Resource" id="Day_friday"]
 script = ExtResource("2_day")
 title = "FRIDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_friday_canvas")])
+games = Array[ExtResource("3_game")]([SubResource("Game_position_lock"), SubResource("Game_shield_break"), SubResource("Game_friday_canvas")])
 
 [resource]
 script = ExtResource("1_week")

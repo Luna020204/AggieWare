@@ -3,6 +3,8 @@ extends SceneTree
 ## godot --headless --path . --script res://tools/test_collection.gd
 
 const GAME_PATHS := {
+	"position_lock": "res://scenes/microgames/position_lock.tscn",
+	"shield_break": "res://scenes/microgames/shield_break.tscn",
 	"canvas": "res://scenes/microgames/canvas.tscn",
 	"schedule_builder": "res://scenes/microgames/schedule_builder.tscn",
 	"stay_focused": "res://scenes/microgames/stay_focused.tscn",
@@ -294,7 +296,7 @@ func _test_week_flow() -> void:
 				flow._advance_after_clear()
 				if day + 1 < flow.week_plan.stages.size():
 					_finish_bike(flow)
-	_check(saw_crossing and completed == 6, "Complete week plays all six rounds including Crossing")
+	_check(saw_crossing and completed == 8, "Complete week plays all eight rounds including Crossing")
 	_check(cleared == [0, 1, 2, 3, 4] and flow.state == flow.FlowState.TITLE, "Friday returns to title with each day cleared once")
 	await _dispose(flow)
 
@@ -557,6 +559,16 @@ func _test_bike_obstacles() -> void:
 func _win_game(kind: String, session: Variant) -> void:
 	var game: Variant = _game_body(session)
 	match kind:
+		"position_lock":
+			for frame in 100:
+				if game._ended:
+					break
+				game.camera = game.vessel
+				game._process(0.01)
+		"shield_break":
+			game.gun_x = game.target_x
+			for shot in game.REQUIRED_HITS[game.difficulty]:
+				game.fire()
 		"canvas": _win_canvas(game)
 		"schedule_builder":
 			game._seconds_left = game._round_seconds - game.OPEN_DELAY
