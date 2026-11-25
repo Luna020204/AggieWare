@@ -93,4 +93,6 @@ func _run() -> void:
 		_check(gun._ended and gun.hits == gun.REQUIRED_HITS[difficulty], "Accessible hold-to-mash wins")
 		await _dispose(gun)
 	print("FESTIVAL_CHECKS %d; failures %d" % [checks, failures])
+	if failures == 0:
+		print("FESTIVAL_TESTS_OK")
 	quit(1 if failures else 0)
