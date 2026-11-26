@@ -12,6 +12,8 @@ const ENTRIES: Array[Dictionary] = [
 	{"id": "swipe", "title": "Swipe Card", "day": "Rush Hour", "scene": "res://scenes/microgames/swipe_card.tscn", "verb": "SWIPE!", "icon": "drag", "instruction": "FIND YOUR AGGIE CARD, THEN SWIPE!"},
 	{"id": "awake", "title": "Stay Awake", "day": "Lecture Hall", "scene": "res://scenes/microgames/stay_awake.tscn", "verb": "POP!", "icon": "click", "instruction": "CLICK EVERY Z BEFORE IT HITS."},
 	{"id": "microscope", "title": "Microscope", "day": "Lecture Hall", "scene": "res://scenes/microgames/microscope.tscn", "verb": "FIND!", "icon": "arrows", "instruction": "CENTER THE GOLD AGGIE BACTERIA."},
+	{"id": "position_lock", "title": "Position Lock", "day": "Fri", "scene": "res://scenes/microgames/position_lock.tscn", "verb": "LOCK!", "icon": "arrows", "instruction": "MOVE FRAME. HOLD VESSEL INSIDE."},
+	{"id": "shield_break", "title": "Shield Break", "day": "Fri", "scene": "res://scenes/microgames/shield_break.tscn", "verb": "FIRE!", "icon": "arrows_lr", "instruction": "AIM AT SHIELD. MASH ACTION."},
 ]
 
 const DIFFICULTY_NAMES: Array[String] = ["EASY", "NORMAL", "HARD"]

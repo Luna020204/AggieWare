@@ -12,7 +12,7 @@ func _run() -> void:
 	create_timer(40.0, true, false, true).timeout.connect(func() -> void:
 		push_error("Presentation tests exceeded their deadline.")
 		quit(1))
-	_check(Catalog.ENTRIES.size() == 9 and Catalog.find_index("crossing") >= 0, "Catalog contains all nine games including Campus Crossing")
+	_check(Catalog.ENTRIES.size() == 11 and Catalog.find_index("crossing") >= 0, "Catalog contains all eleven games including Campus Crossing")
 	_test_native_preservation()
 	for entry: Dictionary in Catalog.ENTRIES:
 		for difficulty: int in 3:

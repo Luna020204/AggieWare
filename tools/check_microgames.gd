@@ -17,9 +17,9 @@ func _run() -> void:
 	_catalog = load("res://scripts/core/microgame_catalog.gd")
 	root.get_node("GameState").set_setting(&"timer_assist", 1.0)
 	print("microgame              diff    contract tick timeout          win  fail")
-	if _catalog.ENTRIES.size() != 9:
+	if _catalog.ENTRIES.size() != 11:
 		_failures += 1
-		push_error("Catalog must contain all nine integrated microgames.")
+		push_error("Catalog must contain all eleven integrated microgames.")
 	for entry: Dictionary in _catalog.ENTRIES:
 		for difficulty: int in 3:
 			await _check_one(entry, difficulty)
@@ -153,8 +153,8 @@ func _check_flow_prompt() -> void:
 			game.skip_intro()
 			if not game.can_interact():
 				problems.append("day %d round %d: intro did not release play" % [stage + 1, round_index + 1])
-	if rounds != 6:
-		problems.append("the default week no longer has its six rounds")
+	if rounds != 8:
+		problems.append("the default week no longer has its eight rounds")
 	flow.queue_free()
 	await process_frame
 	_report_group("week introductions", problems)
