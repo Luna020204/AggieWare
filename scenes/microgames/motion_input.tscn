@@ -1,0 +1,117 @@
+[gd_scene format=4 uid="uid://b6t71ffy4rwia"]
+
+[ext_resource type="Script" uid="uid://c8m50vt4bnevo" path="res://scripts/microgames/motion_input.gd" id="1_rbqca"]
+[ext_resource type="Texture2D" uid="uid://c1hibfrxjf05j" path="res://assets/art/microgames/commute/tilemap1_updated.png" id="2_tchfp"]
+[ext_resource type="Texture2D" uid="uid://cyy05tf8vt2pa" path="res://assets/art/microgames/motion_input/fighter_stand.png" id="4_5plk4"]
+[ext_resource type="Script" uid="uid://dqk6t5sq5s7v1" path="res://scripts/motion_input/fighter.gd" id="4_errmm"]
+[ext_resource type="Texture2D" uid="uid://b28kctdymbufv" path="res://assets/art/microgames/commute/cow.png" id="4_rjsbh"]
+[ext_resource type="Texture2D" uid="uid://cdj4bgs3njcca" path="res://assets/art/microgames/motion_input/qcf.png" id="5_mlupa"]
+[ext_resource type="Texture2D" uid="uid://ccwnxasaer361" path="res://assets/art/microgames/motion_input/semi.png" id="6_errmm"]
+[ext_resource type="Texture2D" uid="uid://bflouxpei7cfi" path="res://assets/art/microgames/motion_input/360.png" id="7_6vu0i"]
+[ext_resource type="Script" uid="uid://j77d6566hse1" path="res://scripts/motion_input/qcf.gd" id="7_i8ijs"]
+[ext_resource type="Texture2D" uid="uid://bakfep1fn8qjh" path="res://assets/art/microgames/motion_input/fighter_fireball.png" id="8_errmm"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kaiji"]
+texture = ExtResource("2_tchfp")
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+4:0/0 = 0
+5:0/0 = 0
+6:0/0 = 0
+7:0/0 = 0
+8:0/0 = 0
+0:2/0 = 0
+1:2/0 = 0
+2:2/0 = 0
+3:2/0 = 0
+5:2/0 = 0
+6:2/0 = 0
+7:2/0 = 0
+8:2/0 = 0
+1:3/0 = 0
+2:3/0 = 0
+3:3/0 = 0
+5:3/0 = 0
+6:3/0 = 0
+7:3/0 = 0
+8:3/0 = 0
+5:4/0 = 0
+6:4/0 = 0
+7:4/0 = 0
+8:4/0 = 0
+5:5/0 = 0
+6:5/0 = 0
+7:5/0 = 0
+8:5/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_lm4sj"]
+sources/0 = SubResource("TileSetAtlasSource_kaiji")
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lm4sj"]
+
+[node name="MotionInputMicrogame" type="Control" unique_id=1714385460]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_rbqca")
+difficulty = 2
+prompt = "PERFORM"
+game_title = "MOTION INPUT"
+instruction_text = "PERFORM CORRECT INPUTS IN SEQUENCE"
+
+[node name="World" type="Node2D" parent="." unique_id=1495207549]
+
+[node name="TileMapLayer" type="TileMapLayer" parent="World" unique_id=201790298]
+scale = Vector2(5, 5)
+tile_map_data = PackedByteArray("AAAEAAMAAAADAAAAAAAEAAQAAAADAAAAAAAEAAUAAAADAAAAAAAEAAYAAAADAAAAAAAEAAcAAAADAAAAAAAFAAMAAAADAAAAAAAFAAQAAAADAAAAAAAFAAUAAAADAAAAAAAFAAcAAAADAAAAAAAGAAMAAAADAAAAAAAGAAQAAAADAAAAAAAGAAUAAAADAAAAAAAGAAcAAAADAAAAAAAHAAMAAAADAAAAAAAHAAQAAAADAAAAAAAHAAUAAAADAAAAAAAHAAYAAAADAAAAAAAHAAcAAAADAAAAAAAIAAMAAAADAAAAAAAIAAQAAAADAAAAAAAIAAUAAAADAAAAAAAIAAYAAAADAAAAAAAIAAcAAAADAAAAAAAIAAgAAAADAAAAAAAJAAMAAAADAAAAAAAJAAQAAAADAAAAAAAJAAUAAAADAAAAAAAJAAcAAAADAAAAAAAJAAgAAAADAAAAAAAKAAMAAAADAAAAAAAKAAQAAAADAAAAAAAKAAUAAAADAAAAAAAKAAcAAAADAAAAAAAKAAgAAAADAAAAAAALAAMAAAADAAAAAAALAAUAAAADAAAAAAALAAYAAAADAAAAAAALAAcAAAADAAAAAAALAAgAAAADAAAAAAAMAAMAAAADAAAAAAAMAAQAAAADAAAAAAAMAAYAAAADAAAAAAAMAAcAAAADAAAAAAAMAAgAAAADAAAAAAANAAMAAAADAAAAAAANAAQAAAADAAAAAAANAAcAAAADAAAAAAANAAgAAAADAAAAAAAOAAMAAAADAAAAAAAOAAYAAAADAAAAAAAOAAcAAAADAAAAAAAOAAgAAAADAAAAAAAPAAMAAAADAAAAAAAPAAQAAAADAAAAAAAPAAUAAAADAAAAAAAPAAYAAAADAAAAAAAPAAcAAAADAAAAAAAPAAgAAAADAAAAAAAAAAAAAAADAAAAAAAAAAEAAAADAAAAAAAAAAIAAAADAAAAAAAAAAMAAAADAAAAAAAAAAQAAAADAAAAAAAAAAUAAAADAAAAAAAAAAYAAAADAAAAAAAAAAcAAAADAAAAAAABAAAAAAADAAAAAAABAAEAAAADAAAAAAABAAIAAAADAAAAAAABAAMAAAADAAAAAAABAAQAAAADAAAAAAABAAUAAAADAAAAAAABAAYAAAADAAAAAAABAAcAAAADAAAAAAACAAAAAAADAAAAAAACAAEAAAADAAAAAAACAAIAAAADAAAAAAACAAMAAAADAAAAAAACAAQAAAADAAAAAAACAAUAAAADAAAAAAACAAYAAAADAAAAAAACAAcAAAADAAAAAAADAAAAAAADAAAAAAADAAEAAAADAAAAAAADAAIAAAADAAAAAAADAAMAAAADAAAAAAADAAQAAAADAAAAAAADAAUAAAADAAAAAAADAAYAAAADAAAAAAADAAcAAAADAAAAAAAEAAAAAAADAAAAAAAEAAEAAAADAAAAAAAEAAIAAAADAAAAAAAFAAAAAAADAAAAAAAFAAEAAAADAAAAAAAGAAAAAAADAAAAAAAGAAEAAAADAAAAAAAGAAIAAAADAAAAAAAHAAEAAAADAAAAAAAHAAIAAAADAAAAAAAIAAEAAAADAAAAAAAIAAIAAAADAAAAAAAKAAAAAAADAAAAAAAKAAEAAAADAAAAAAALAAAAAAADAAAAAAALAAEAAAADAAAAAAALAAIAAAADAAAAAAAMAAAAAAADAAAAAAAMAAEAAAADAAAAAAAMAAIAAAADAAAAAAANAAAAAAADAAAAAAANAAEAAAADAAAAAAANAAIAAAADAAAAAAAOAAAAAAADAAAAAAAOAAEAAAADAAAAAAAOAAIAAAADAAAAAAAPAAAAAAADAAAAAAAPAAEAAAADAAAAAAAPAAIAAAADAAAAAAAMAAUAAAADAAAAAAAOAAQAAAADAAAAAAAOAAUAAAADAAAAAAANAAYAAAADAAAAAAANAAUAAAADAAAAAAALAAQAAAADAAAAAAAHAAAAAAADAAAAAAAIAAAAAAADAAAAAAAJAAYAAAADAAAAAAAGAAYAAAADAAAAAAAJAAIAAAADAAAAAAAKAAIAAAADAAAAAAAKAAYAAAADAAAAAAAFAAYAAAADAAAAAAAFAAIAAAADAAAAAAAJAAEAAAADAAAAAAAJAAAAAAADAAAAAAAAAAgAAAADAAAAAAABAAgAAAADAAAAAAACAAgAAAADAAAAAAADAAgAAAADAAAAAAAEAAgAAAADAAAAAAAFAAgAAAADAAAAAAAGAAgAAAADAAAAAAAHAAgAAAADAAAAAAA=")
+tile_set = SubResource("TileSet_lm4sj")
+
+[node name="Camera2D" type="Camera2D" parent="World" unique_id=908082806]
+position = Vector2(640, 360)
+
+[node name="Player" type="CharacterBody2D" parent="World" unique_id=579619678]
+unique_name_in_owner = true
+position = Vector2(254.00005, 515)
+scale = Vector2(5, 5)
+script = ExtResource("4_errmm")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/Player" unique_id=1272747461]
+shape = SubResource("RectangleShape2D_lm4sj")
+
+[node name="Fighter" type="Sprite2D" parent="World/Player" unique_id=1835338145]
+unique_name_in_owner = true
+texture = ExtResource("4_5plk4")
+
+[node name="Cow" type="Sprite2D" parent="World" unique_id=881097053]
+position = Vector2(923, 558)
+scale = Vector2(4.9999995, 4.9999995)
+texture = ExtResource("4_rjsbh")
+
+[node name="QCF" type="Sprite2D" parent="World" unique_id=1436256159]
+unique_name_in_owner = true
+position = Vector2(622, 159)
+scale = Vector2(5, 5)
+texture = ExtResource("5_mlupa")
+script = ExtResource("7_i8ijs")
+
+[node name="Semi" type="Sprite2D" parent="World" unique_id=952766067]
+unique_name_in_owner = true
+position = Vector2(622.99994, 148.99997)
+scale = Vector2(5, 5)
+texture = ExtResource("6_errmm")
+script = ExtResource("7_i8ijs")
+
+[node name="Circle" type="Sprite2D" parent="World" unique_id=24163370]
+unique_name_in_owner = true
+position = Vector2(648, 154)
+scale = Vector2(5, 5)
+texture = ExtResource("7_6vu0i")
+script = ExtResource("7_i8ijs")
+
+[node name="Fireball" type="Sprite2D" parent="World" unique_id=745015338]
+unique_name_in_owner = true
+position = Vector2(423.99997, 524.99994)
+scale = Vector2(5, 5)
+texture = ExtResource("8_errmm")
+script = ExtResource("7_i8ijs")
