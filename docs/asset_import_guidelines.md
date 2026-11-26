@@ -67,9 +67,22 @@ For ordinary 2D pixel-art sprites and UI:
 
 Use **Nearest** texture filtering on the node displaying pixel art, or an appropriate shared parent. This is a display setting, not an image Import option in Godot 4.
 
-Prefer whole-number scaling, such as 2× or 3×, to keep pixels consistent. Check transparency and appearance at the intended display size.
+For project-authored microgame art, use the 5× convention below. Downloaded packs may retain another whole-number scale when needed. Check transparency and appearance at the intended display size.
 
 Different settings may be needed for non-pixel artwork or heavily downscaled images.
+
+### Team convention for generated microgame pixel art
+
+Following Luna's SCRUM-35 guidance (November 21, 2026; reference PRs #14, #16 and #17):
+
+- Generate original pixel art with Python/Pillow (PIL) scripts in `tools/art/`.
+- Draw on a **256×144** grid, one fifth of the **1280×720** game layout. Individual sprites use appropriately sized canvases on that same grid.
+- Write PNGs to `assets/art/microgames/<game>/` and commit both the generator and its output.
+- Display artwork at **5×** with `TEXTURE_FILTER_NEAREST`. Keep lossless compression and mipmaps off.
+- Use the **AggiePixel** bitmap font at sizes that are multiples of **7**. Preserve explicitly documented exceptions, such as AggieMono for case-sensitive code in Variable Not in Scope.
+- Keep live UI elements such as progress bars, aim indicators, and timer labels in Godot; backgrounds and sprite artwork come from the generated images.
+
+Example: after installing Pillow, run `python3 tools/art/gen_festival_art.py` from the project root. `python3 tools/art/gen_festival_art.py --check` verifies the committed PNG pixel data without rewriting it. The SCRUM-75 scenes load these images at 5× through the shared nearest-filtered pixel canvas.
 
 ## 5. Audio Settings
 

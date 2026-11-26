@@ -1,6 +1,10 @@
 extends "res://scripts/core/microgame_base.gd"
 
 const UI := preload("res://scripts/ui/microgame_ui.gd")
+const BACKGROUND := preload("res://assets/art/microgames/shield_break/festival_bg.png")
+const VESSEL := preload("res://assets/art/microgames/shield_break/vessel.png")
+const SHIELD := preload("res://assets/art/microgames/shield_break/shield.png")
+const GUN := preload("res://assets/art/microgames/shield_break/gun.png")
 const DURATIONS := [9.0, 8.0, 7.0]
 var _art: Control
 var _timer_label: Label
@@ -18,19 +22,10 @@ func _show_result(_success: bool, _message: String) -> void:
 	_art.queue_redraw()
 
 func _draw_backdrop() -> void:
-	_art.draw_rect(Rect2(0, 0, 1280, 720), Color("101a36"))
-	for i in 45:
-		_art.draw_rect(Rect2((i * 197 + 35) % 1260, (i * 113 + 110) % 620, 5, 5), Color("526582"))
-	_art.draw_rect(Rect2(0, 650, 1280, 70), Color("233956"))
-	for x in range(0, 1280, 80):
-		_art.draw_rect(Rect2(x, 650, 40, 10), UI.GOLD)
+	_art.draw_texture_rect(BACKGROUND, Rect2(0, 0, 1280, 720), false)
 
 func _draw_vessel(at: Vector2) -> void:
-	_art.draw_rect(Rect2(at + Vector2(-40, -10), Vector2(80, 25)), Color("9ad2db"))
-	_art.draw_rect(Rect2(at + Vector2(-20, -25), Vector2(40, 20)), Color("4d8dbb"))
-	_art.draw_rect(Rect2(at + Vector2(-10, -20), Vector2(20, 10)), UI.GOLD)
-	_art.draw_rect(Rect2(at + Vector2(-25, 15), Vector2(15, 15)), Color("f28553"))
-	_art.draw_rect(Rect2(at + Vector2(10, 15), Vector2(15, 15)), Color("f28553"))
+	_art.draw_texture_rect(VESSEL, Rect2(at + Vector2(-40, -25), Vector2(80, 55)), false)
 
 const REQUIRED_HITS := [6, 9, 12]
 var gun_x := 300.0
@@ -85,7 +80,7 @@ func _draw_world() -> void:
 	_draw_vessel(Vector2(target_x, 265))
 	var remaining: float = 1.0 - float(hits) / REQUIRED_HITS[difficulty]
 	if remaining > 0.0:
-		_art.draw_rect(Rect2(target_x - 100, 210, 200, 110), UI.SUCCESS if _beam_hit and _beam_left > 0.0 else Color("58b9e5"), false, 10)
+		_art.draw_texture_rect(SHIELD, Rect2(target_x - 105, 205, 210, 120), false, UI.SUCCESS if _beam_hit and _beam_left > 0.0 else Color("58b9e5"))
 	_art.draw_rect(Rect2(target_x - 100, 170, 200, 15), Color("394c68"))
 	_art.draw_rect(Rect2(target_x - 100, 170, 200 * remaining, 15), UI.SUCCESS)
 	var aligned := absf(gun_x - target_x) <= 100.0
@@ -93,6 +88,5 @@ func _draw_world() -> void:
 		_art.draw_rect(Rect2(gun_x - 2, y, 5, 10), Color("46715c") if aligned else Color("3b4d6b"))
 	if _beam_left > 0.0:
 		_art.draw_rect(Rect2(_beam_x - 5, 320 if _beam_hit else 120, 10, 260 if _beam_hit else 460), UI.GOLD)
-	_art.draw_rect(Rect2(gun_x - 45, 605, 90, 30), Color("577494"))
-	_art.draw_rect(Rect2(gun_x - 25, 580, 50, 30), Color("9ad2db"))
+	_art.draw_texture_rect(GUN, Rect2(gun_x - 45, 550, 90, 85), false)
 	_art.draw_rect(Rect2(gun_x - 10, 550, 20, 40), UI.SUCCESS if aligned else UI.GOLD)

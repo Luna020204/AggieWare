@@ -1,6 +1,9 @@
 extends "res://scripts/core/microgame_base.gd"
 
 const UI := preload("res://scripts/ui/microgame_ui.gd")
+const BACKGROUND := preload("res://assets/art/microgames/position_lock/festival_bg.png")
+const VESSEL := preload("res://assets/art/microgames/position_lock/vessel.png")
+const CAMERA_FRAME := preload("res://assets/art/microgames/position_lock/camera_frame.png")
 const DURATIONS := [9.0, 8.0, 7.0]
 var _art: Control
 var _timer_label: Label
@@ -18,19 +21,10 @@ func _show_result(_success: bool, _message: String) -> void:
 	_art.queue_redraw()
 
 func _draw_backdrop() -> void:
-	_art.draw_rect(Rect2(0, 0, 1280, 720), Color("101a36"))
-	for i in 45:
-		_art.draw_rect(Rect2((i * 197 + 35) % 1260, (i * 113 + 110) % 620, 5, 5), Color("526582"))
-	_art.draw_rect(Rect2(0, 650, 1280, 70), Color("233956"))
-	for x in range(0, 1280, 80):
-		_art.draw_rect(Rect2(x, 650, 40, 10), UI.GOLD)
+	_art.draw_texture_rect(BACKGROUND, Rect2(0, 0, 1280, 720), false)
 
 func _draw_vessel(at: Vector2) -> void:
-	_art.draw_rect(Rect2(at + Vector2(-40, -10), Vector2(80, 25)), Color("9ad2db"))
-	_art.draw_rect(Rect2(at + Vector2(-20, -25), Vector2(40, 20)), Color("4d8dbb"))
-	_art.draw_rect(Rect2(at + Vector2(-10, -20), Vector2(20, 10)), UI.GOLD)
-	_art.draw_rect(Rect2(at + Vector2(-25, 15), Vector2(15, 15)), Color("f28553"))
-	_art.draw_rect(Rect2(at + Vector2(10, 15), Vector2(15, 15)), Color("f28553"))
+	_art.draw_texture_rect(VESSEL, Rect2(at + Vector2(-40, -25), Vector2(80, 55)), false)
 
 const LOCK_SECONDS := 0.65
 const TARGET_SPEEDS := [0.65, 0.9, 1.15]
@@ -78,8 +72,6 @@ func _draw_world() -> void:
 	_draw_backdrop()
 	_draw_vessel(vessel)
 	var color := UI.SUCCESS if lock_progress > 0.0 else UI.GOLD
-	_art.draw_rect(Rect2(camera - Vector2(105, 80), Vector2(210, 160)), color, false, 5)
-	_art.draw_line(camera - Vector2(15, 0), camera + Vector2(15, 0), color, 5)
-	_art.draw_line(camera - Vector2(0, 15), camera + Vector2(0, 15), color, 5)
+	_art.draw_texture_rect(CAMERA_FRAME, Rect2(camera - Vector2(105, 80), Vector2(215, 165)), false, color)
 	_art.draw_rect(Rect2(camera + Vector2(-100, 95), Vector2(200, 10)), Color("394c68"))
 	_art.draw_rect(Rect2(camera + Vector2(-100, 95), Vector2(200 * minf(lock_progress / LOCK_SECONDS, 1.0), 10)), UI.SUCCESS)
