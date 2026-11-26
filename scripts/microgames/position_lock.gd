@@ -24,12 +24,12 @@ func _draw_backdrop() -> void:
 	_art.draw_texture_rect(BACKGROUND, Rect2(0, 0, 1280, 720), false)
 
 func _draw_vessel(at: Vector2) -> void:
-	_art.draw_texture_rect(VESSEL, Rect2(at + Vector2(-40, -25), Vector2(80, 55)), false)
+	_art.draw_texture_rect(VESSEL, Rect2(at.snapped(Vector2(5, 5)) + Vector2(-40, -25), Vector2(80, 55)), false)
 
 const LOCK_SECONDS := 0.65
 const TARGET_SPEEDS := [0.65, 0.9, 1.15]
 var camera := Vector2(270, 460)
-var vessel := Vector2(960, 330)
+var vessel := Vector2(790, 500)
 var lock_progress := 0.0
 
 func _build_ui() -> void:
@@ -38,9 +38,9 @@ func _build_ui() -> void:
 	_status_label = UI.label(self, "", Vector2(30, 65), 14, UI.TEXT)
 
 func _reset_game() -> void:
-	_elapsed = 0.0
+	_elapsed = PI / (2.0 * TARGET_SPEEDS[difficulty])
 	camera = Vector2(270, 460)
-	vessel = Vector2(960, 330)
+	vessel = Vector2(790, 500)
 	lock_progress = 0.0
 	_update_labels()
 	_art.queue_redraw()
@@ -54,7 +54,7 @@ func _update_game(delta: float) -> void:
 		_elapsed += step
 		camera += InputActions.movement_vector() * 680.0 * step
 		camera = camera.clamp(Vector2(100, 190), Vector2(1180, 560))
-		vessel = Vector2(790 + 170 * cos(_elapsed * TARGET_SPEEDS[difficulty]), 330 + 100 * sin(_elapsed * TARGET_SPEEDS[difficulty]))
+		vessel = Vector2(790 + 170 * cos(_elapsed * TARGET_SPEEDS[difficulty]), 400 + 100 * sin(_elapsed * TARGET_SPEEDS[difficulty]))
 		if absf(camera.x - vessel.x) <= 60.0 and absf(camera.y - vessel.y) <= 45.0:
 			lock_progress += step
 		else:
@@ -66,12 +66,13 @@ func _update_game(delta: float) -> void:
 
 func _update_labels() -> void:
 	_timer_label.text = "TIME %.1f" % _seconds_left
-	_status_label.text = "MOVE %s / %s / %s / %s   LOCK %d%%" % [InputActions.action_label(InputActions.ACTION_UP), InputActions.action_label(InputActions.ACTION_DOWN), InputActions.action_label(InputActions.ACTION_LEFT), InputActions.action_label(InputActions.ACTION_RIGHT), mini(100, int(lock_progress / LOCK_SECONDS * 100))]
+	_status_label.text = "LOCK %d%%" % mini(100, int(lock_progress / LOCK_SECONDS * 100))
 
 func _draw_world() -> void:
 	_draw_backdrop()
 	_draw_vessel(vessel)
+	var drawn_camera := camera.snapped(Vector2(5, 5))
 	var color := UI.SUCCESS if lock_progress > 0.0 else UI.GOLD
-	_art.draw_texture_rect(CAMERA_FRAME, Rect2(camera - Vector2(105, 80), Vector2(215, 165)), false, color)
-	_art.draw_rect(Rect2(camera + Vector2(-100, 95), Vector2(200, 10)), Color("394c68"))
-	_art.draw_rect(Rect2(camera + Vector2(-100, 95), Vector2(200 * minf(lock_progress / LOCK_SECONDS, 1.0), 10)), UI.SUCCESS)
+	_art.draw_texture_rect(CAMERA_FRAME, Rect2(drawn_camera - Vector2(105, 80), Vector2(215, 165)), false, color)
+	_art.draw_rect(Rect2(drawn_camera + Vector2(-100, 95), Vector2(200, 10)), Color("394c68"))
+	_art.draw_rect(Rect2(drawn_camera + Vector2(-100, 95), Vector2(200 * minf(lock_progress / LOCK_SECONDS, 1.0), 10)), UI.SUCCESS)

@@ -73,7 +73,7 @@ func fire() -> void:
 
 func _update_labels() -> void:
 	_timer_label.text = "TIME %.1f" % _seconds_left
-	_status_label.text = "AIM %s / %s   FIRE %s   SHIELD %d" % [InputActions.action_label(InputActions.ACTION_LEFT), InputActions.action_label(InputActions.ACTION_RIGHT), InputActions.action_label(InputActions.ACTION_MASH), maxi(0, REQUIRED_HITS[difficulty] - hits)]
+	_status_label.text = "SHIELD %d" % maxi(0, REQUIRED_HITS[difficulty] - hits)
 
 func _draw_world() -> void:
 	_draw_backdrop()
@@ -83,10 +83,11 @@ func _draw_world() -> void:
 		_art.draw_texture_rect(SHIELD, Rect2(target_x - 105, 205, 210, 120), false, UI.SUCCESS if _beam_hit and _beam_left > 0.0 else Color("58b9e5"))
 	_art.draw_rect(Rect2(target_x - 100, 170, 200, 15), Color("394c68"))
 	_art.draw_rect(Rect2(target_x - 100, 170, 200 * remaining, 15), UI.SUCCESS)
+	var drawn_gun := snappedf(gun_x, 5.0)
 	var aligned := absf(gun_x - target_x) <= 100.0
 	for y in range(340, 570, 30):
-		_art.draw_rect(Rect2(gun_x - 2, y, 5, 10), Color("46715c") if aligned else Color("3b4d6b"))
+		_art.draw_rect(Rect2(drawn_gun - 2, y, 5, 10), Color("46715c") if aligned else Color("3b4d6b"))
 	if _beam_left > 0.0:
-		_art.draw_rect(Rect2(_beam_x - 5, 320 if _beam_hit else 120, 10, 260 if _beam_hit else 460), UI.GOLD)
-	_art.draw_texture_rect(GUN, Rect2(gun_x - 45, 550, 90, 85), false)
-	_art.draw_rect(Rect2(gun_x - 10, 550, 20, 40), UI.SUCCESS if aligned else UI.GOLD)
+		_art.draw_rect(Rect2(snappedf(_beam_x, 5.0) - 5, 320 if _beam_hit else 120, 10, 260 if _beam_hit else 460), UI.GOLD)
+	_art.draw_texture_rect(GUN, Rect2(drawn_gun - 45, 550, 90, 85), false)
+	_art.draw_rect(Rect2(drawn_gun - 10, 550, 20, 40), UI.SUCCESS if aligned else UI.GOLD)

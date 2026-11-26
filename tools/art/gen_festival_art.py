@@ -13,13 +13,22 @@ OUT = Path(__file__).resolve().parents[2] / 'assets/art/microgames'
 
 
 def assets():
-    background = Image.new('RGBA', (256, 144), '#101a36')
+    # ECS 179 demonstration station in Kemper Hall, UC Davis.
+    background = Image.new('RGBA', (256, 144), '#c1b49d')
     draw = ImageDraw.Draw(background)
-    for i in range(45):
-        draw.point((((i * 197 + 35) % 1260) // 5, ((i * 113 + 110) % 620) // 5), fill='#526582')
-    draw.rectangle((0, 130, 255, 143), fill='#233956')
-    for x in range(0, 256, 16):
-        draw.rectangle((x, 130, x + 7, 131), fill='#ffbf00')
+    draw.rectangle((0, 0, 255, 19), fill='#243b52')
+    draw.text((84, 4), 'KEMPER HALL', fill='#ffd04d')
+    for x in (4, 228):
+        draw.rectangle((x, 26, x+23, 98), fill='#556d7a')
+        draw.rectangle((x+2, 28, x+21, 96), fill='#8daab0')
+        draw.line((x+12, 28, x+12, 96), fill='#304557', width=2)
+    draw.rectangle((7, 23, 249, 129), fill='#172735')
+    draw.rectangle((11, 27, 245, 125), fill='#253d50')
+    draw.rectangle((0, 130, 255, 143), fill='#705944')
+    draw.rectangle((94, 131, 163, 140), fill='#384956')
+    for x in range(98, 160, 6):
+        draw.line((x, 133, x, 137), fill='#8a9a9c')
+    draw.rectangle((176, 132, 190, 139), fill='#b5b8a7')
     vessel = Image.new('RGBA', (16, 11))
     draw = ImageDraw.Draw(vessel)
     draw.rectangle((0, 3, 15, 7), fill='#9ad2db')
