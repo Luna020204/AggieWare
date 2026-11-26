@@ -7,6 +7,7 @@ const ResultPresentation = preload("res://scripts/ui/result_cue.gd")
 signal round_completed(success: bool)
 signal time_changed(seconds_left: float, round_seconds: float)
 signal result_finished
+signal gameplay_started
 
 @export_range(0, 2, 1) var difficulty := 0
 @export var managed_by_flow := false
@@ -114,6 +115,7 @@ func _begin_play() -> void:
 	_intro_view.hide()
 	_update_intro_progress(_intro_duration, _intro_duration)
 	_set_timer_visibility(true)
+	gameplay_started.emit()
 	Accessibility.begin_microgame(playback_speed, self)
 
 func skip_intro() -> void:
