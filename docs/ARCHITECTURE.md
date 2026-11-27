@@ -71,7 +71,7 @@ The catalog is the shared creation boundary for both week flow and launcher. Hos
 
 The WeekPlan holds the days in order. StageDefinition chooses a game index from its own pool using the win count and previous scene path. Ordered days advance on wins. Pool days exclude every entry that points to the last scene when an alternative exists. The host selects once before the bike preview and mounts that same index on arrival. Day wins are independent of the index. SettingsStore saves the highest unlocked day alongside the player's options.
 
-The host sets the minimum difficulty tier and playback speed using day and win progress. Game-specific difficulty floors still apply. Accessibility owns the gameplay clock and restores it for results. When an AudioManager with set_progress is present it receives the same normalized progress. The week works without an audio autoload.
+The host sets the minimum difficulty tier and playback speed using day and win progress. Game-specific difficulty floors still apply. Accessibility owns the gameplay clock and restores it for results. On the first active clock tick after each intro, AudioManager applies that same progress to the looping 8 Bit Aggie track. Timer assist scales both clocks. The music player changes playback speed and pitch together. Returning to the title restores 1× playback.
 
 The flow reserves `RESULT` synchronously before changing score or lives. Run tokens protect time, outcome, result-finished and bike callbacks from obsolete rounds. The launcher uses the same guards. Replacement detaches nodes immediately and defers destruction, preventing stale controls from processing on a newer screen.
 

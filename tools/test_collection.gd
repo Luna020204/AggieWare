@@ -129,6 +129,9 @@ func _prepare_round(flow: Variant) -> Variant:
 func _dispose(node: Node) -> void:
 	root.get_node("GameState").resume_game()
 	if is_instance_valid(node):
+		if node.scene_file_path == "res://scenes/core/game_flow.tscn":
+			await DRIVER.dispose_flow(node)
+			return
 		node.queue_free()
 	await process_frame
 

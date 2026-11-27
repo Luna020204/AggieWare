@@ -37,3 +37,11 @@ static func tick(game: Variant, delta: float) -> void:
 
 static func finish(game: Variant, success: bool, message := "TEST RESULT") -> void:
 	body(game)._finish_round(success, message)
+
+## A stopped stream releases its decoder on the mixer thread. Let the mixer
+## and the main loop drain before a headless suite shuts the engine down.
+static func dispose_flow(flow: Node) -> void:
+	var tree := flow.get_tree()
+	flow.queue_free()
+	await tree.process_frame
+	await tree.create_timer(0.12, true, false, true).timeout

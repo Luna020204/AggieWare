@@ -38,6 +38,7 @@ var _pending_stage := 0
 var _pending_round := 0
 var _run_token := 0
 var _round_success := false
+var _pending_music_progress := -1.0
 
 
 func _ready() -> void:
@@ -51,6 +52,10 @@ func _ready() -> void:
 		_show_configuration_error("\n".join(errors))
 		return
 	_show_title()
+
+
+func _exit_tree() -> void:
+	AudioManager.stop_music(0.0)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -128,6 +133,7 @@ func _show_title() -> void:
 	_clear_active_scene()
 	_center.show()
 	state = FlowState.TITLE
+	AudioManager.play_title_music()
 	_header_label.text = "AGGIEWARE"
 	_subtitle_label.text = "A week of tiny games at UC Davis"
 	_clear_content()
@@ -206,9 +212,7 @@ func _start_round(stage_index: int, round_index: int) -> void:
 			else:
 				push_warning("Microgame does not support a duration override: " + definition.scene_path)
 	microgame.playback_speed = lerpf(1.0, 1.18, progress)
-	var audio := get_node_or_null("/root/AudioManager")
-	if audio != null and audio.has_method("set_progress"):
-		audio.call("set_progress", progress)
+	_pending_music_progress = progress
 	microgame.result_seconds = result_delay
 	microgame.round_completed.connect(_on_round_completed.bind(_run_token))
 	microgame.time_changed.connect(_on_round_time_changed.bind(_run_token))
@@ -238,6 +242,12 @@ func _prompt_for_stage(stage_index: int, round_index: int = 0) -> String:
 func _on_round_time_changed(seconds_left: float, round_seconds: float, token: int = -1) -> void:
 	if token != -1 and token != _run_token:
 		return
+	# Shared and native games both publish time during play. Their first active
+	# tick also covers custom games without a separate start signal.
+	if state == FlowState.PLAYING and _pending_music_progress >= 0.0 and _active_scene.is_playing():
+		AudioManager.set_progress(_pending_music_progress)
+		AudioManager.play_gameplay_music()
+		_pending_music_progress = -1.0
 	if (state == FlowState.PLAYING or state == FlowState.RESULT) and is_instance_valid(_hud):
 		var stage := week_plan.stages[current_stage]
 		_hud.set_round_status(seconds_left, round_seconds, lives, score, current_stage, week_plan.stages.size(), day_wins, stage.win_goal(), stage.games[current_round].title)

@@ -155,8 +155,7 @@ func _check_flow_prompt() -> void:
 				problems.append("day %d round %d: intro did not release play" % [stage + 1, round_index + 1])
 	if rounds != 15:
 		problems.append("expected 15 pool and ordered entries across the default week")
-	flow.queue_free()
-	await process_frame
+	await DRIVER.dispose_flow(flow)
 	_report_group("week introductions", problems)
 
 

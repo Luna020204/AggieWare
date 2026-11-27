@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="AudioLibrary" format=3 uid="uid://bt70i0uyydscj"]
+
+[ext_resource type="Script" uid="uid://kqp7pxr3mmgr" path="res://scripts/core/audio_library.gd" id="1_audio_library"]
+[ext_resource type="AudioStream" uid="uid://c4pihyulnu661" path="res://audio/music/8 bit aggie.mp3" id="2_tfmfj"]
+
+[resource]
+script = ExtResource("1_audio_library")
+title_music = ExtResource("2_tfmfj")
+gameplay_music = ExtResource("2_tfmfj")

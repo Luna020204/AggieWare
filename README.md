@@ -144,6 +144,7 @@ godot --headless --path . --script res://tools/test_input_routes.gd
 godot --headless --path . --script res://tools/test_presentation.gd
 godot --headless --path . --script res://tools/check_microgames.gd
 godot --headless --path . --script res://tools/smoke_accessibility.gd
+godot --headless --path . --script res://tools/test_music_tempo.gd
 godot --headless --path . --script res://tools/smoke_variable_scope.gd
 godot --headless --path . --script res://tools/smoke_new_microgames.gd
 godot --headless --path . --script res://tests/crossing/test_framework.gd
