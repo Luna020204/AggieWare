@@ -22,6 +22,7 @@ const ACTION_LABELS: Dictionary = {
 
 var path := "user://settings.cfg"
 var _loading := false
+var highest_unlocked_day := 0
 
 
 func _ready() -> void:
@@ -80,10 +81,17 @@ func conflicts(action: StringName, event: InputEventKey) -> Array[String]:
 	return found
 
 
+func unlock_day(day: int) -> void:
+	if day > highest_unlocked_day:
+		highest_unlocked_day = day
+		save_settings()
+
+
 func save_settings() -> void:
 	if _loading or path == "":
 		return
 	var config := ConfigFile.new()
+	config.set_value("week", "highest_unlocked_day", highest_unlocked_day)
 	for setting_name: StringName in GameState.settings:
 		config.set_value("settings", String(setting_name), GameState.settings[setting_name])
 	for action: StringName in REBINDABLE:
@@ -101,6 +109,8 @@ func load_settings() -> void:
 	var config := ConfigFile.new()
 	if path == "" or config.load(path) != OK:
 		return
+	var saved_day: Variant = config.get_value("week", "highest_unlocked_day", 0)
+	highest_unlocked_day = maxi(0, saved_day) if saved_day is int else 0
 	_loading = true
 	for key: String in config.get_section_keys("settings") if config.has_section("settings") else PackedStringArray():
 		var setting_name := StringName(key)

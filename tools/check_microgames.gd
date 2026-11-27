@@ -153,8 +153,8 @@ func _check_flow_prompt() -> void:
 			game.skip_intro()
 			if not game.can_interact():
 				problems.append("day %d round %d: intro did not release play" % [stage + 1, round_index + 1])
-	if rounds != 6:
-		problems.append("the default week no longer has its six rounds")
+	if rounds != 15:
+		problems.append("expected 15 pool and ordered entries across the default week")
 	flow.queue_free()
 	await process_frame
 	_report_group("week introductions", problems)

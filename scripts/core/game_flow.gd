@@ -19,7 +19,9 @@ const UI := preload("res://scripts/ui/microgame_ui.gd")
 
 var state: FlowState = FlowState.TITLE
 var current_stage := 0
-var current_round := 0
+var current_round := 0 # Index of the active definition in the day pool.
+var day_wins := 0
+var _last_scene := ""
 var lives := 3
 var score := 0
 var current_prompt := "PLAY"
@@ -147,12 +149,16 @@ func _show_stage_select() -> void:
 		score = 0
 	state = FlowState.STAGE_SELECT
 	_header_label.text = "SELECT A DAY"
-	_subtitle_label.text = "Choose where your week begins"
+	_subtitle_label.text = "Clear a day to unlock the next one"
 	_clear_content()
 	_stage_buttons.clear()
 	for index: int in week_plan.stages.size():
 		var stage := week_plan.stages[index]
-		var stage_button := _add_button("%d   %s   ·   %d round%s" % [index + 1, stage.title, stage.games.size(), "s" if stage.games.size() != 1 else ""], _start_stage.bind(index))
+		var locked := index > SettingsStore.highest_unlocked_day
+		var label := "%s   ·   %s" % [stage.title, stage.theme] if stage.theme else stage.title
+		label += "   ·   LOCKED" if locked else "   ·   %d WINS" % stage.win_goal()
+		var stage_button := _add_button(label, _start_stage.bind(index))
+		stage_button.disabled = locked
 		stage_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		stage_button.focus_entered.connect(_remember_selected_stage.bind(index))
 		_stage_buttons.append(stage_button)
@@ -160,9 +166,12 @@ func _show_stage_select() -> void:
 
 
 func _start_stage(stage_index: int) -> void:
+	if state == FlowState.STAGE_SELECT and stage_index > SettingsStore.highest_unlocked_day:
+		return
+	day_wins = 0
 	_selected_stage = clampi(stage_index, 0, week_plan.stages.size() - 1)
 	stage_selected.emit(_selected_stage)
-	_start_round(_selected_stage, 0)
+	_start_round(_selected_stage, week_plan.stages[_selected_stage].next_game(0, _last_scene))
 
 
 func _start_round(stage_index: int, round_index: int) -> void:
@@ -171,11 +180,15 @@ func _start_round(stage_index: int, round_index: int) -> void:
 	var stage := week_plan.stages[current_stage]
 	current_round = clampi(round_index, 0, stage.games.size() - 1)
 	var definition := stage.games[current_round]
+	_last_scene = definition.scene_path
 	var entry := MicrogameCatalog.find_by_scene(definition.scene_path).duplicate()
 	entry["scene"] = definition.scene_path
 	entry["title"] = definition.title
 	entry["verb"] = definition.prompt
-	var microgame: Variant = MicrogameCatalog.instantiate(entry, definition.difficulty)
+	var within_day := float(day_wins) / maxf(stage.win_goal(), 1)
+	var progress := clampf((current_stage + within_day) / maxf(week_plan.stages.size() - 1, 1), 0.0, 1.0)
+	var difficulty := maxi(definition.difficulty, floori(progress * 2.0))
+	var microgame: Variant = MicrogameCatalog.instantiate(entry, difficulty)
 	if microgame == null:
 		_show_configuration_error("Scene must implement the microgame host or native contract: " + definition.scene_path)
 		return
@@ -192,6 +205,10 @@ func _start_round(stage_index: int, round_index: int) -> void:
 				microgame.set("duration_override", definition.round_seconds_override)
 			else:
 				push_warning("Microgame does not support a duration override: " + definition.scene_path)
+	microgame.playback_speed = lerpf(1.0, 1.18, progress)
+	var audio := get_node_or_null("/root/AudioManager")
+	if audio != null and audio.has_method("set_progress"):
+		audio.call("set_progress", progress)
 	microgame.result_seconds = result_delay
 	microgame.round_completed.connect(_on_round_completed.bind(_run_token))
 	microgame.time_changed.connect(_on_round_time_changed.bind(_run_token))
@@ -223,7 +240,7 @@ func _on_round_time_changed(seconds_left: float, round_seconds: float, token: in
 		return
 	if (state == FlowState.PLAYING or state == FlowState.RESULT) and is_instance_valid(_hud):
 		var stage := week_plan.stages[current_stage]
-		_hud.set_round_status(seconds_left, round_seconds, lives, score, current_stage, week_plan.stages.size(), current_round, stage.games.size(), stage.games[current_round].title)
+		_hud.set_round_status(seconds_left, round_seconds, lives, score, current_stage, week_plan.stages.size(), day_wins, stage.win_goal(), stage.games[current_round].title)
 
 
 func _on_round_completed(success: bool, token: int = -1) -> void:
@@ -235,6 +252,7 @@ func _on_round_completed(success: bool, token: int = -1) -> void:
 	_round_success = success
 	if success:
 		score += 100
+		day_wins += 1
 	else:
 		lives -= 1
 	if is_instance_valid(_active_scene):
@@ -244,15 +262,13 @@ func _on_round_completed(success: bool, token: int = -1) -> void:
 func _on_result_finished(token: int = -1) -> void:
 	if state != FlowState.RESULT or (token != -1 and token != _run_token):
 		return
-	if _round_success:
-		if current_round + 1 < week_plan.stages[current_stage].games.size():
-			_begin_transition(current_stage, current_round + 1)
-		else:
-			show_stage_clear(current_stage + 1)
+	var stage := week_plan.stages[current_stage]
+	if _round_success and day_wins >= stage.win_goal():
+		show_stage_clear(current_stage + 1)
 	elif lives <= 0:
 		show_game_over()
 	else:
-		_begin_transition(current_stage, current_round)
+		_begin_transition(current_stage, stage.next_game(day_wins, _last_scene))
 
 
 func _begin_transition(next_stage_index: int, next_round_index: int = 0) -> void:
@@ -286,6 +302,7 @@ func show_stage_clear(_next_stage_index: int = -1) -> void:
 	_clear_content()
 	var next_stage := current_stage + 1
 	if next_stage < week_plan.stages.size():
+		SettingsStore.unlock_day(next_stage)
 		_add_message("Nice work. Get ready for the next challenge.")
 		_add_button("Continue to %s" % week_plan.stages[next_stage].title, _advance_after_clear).grab_focus()
 	else:
@@ -317,7 +334,8 @@ func _advance_after_clear() -> void:
 		return
 	var next_stage := current_stage + 1
 	if next_stage < week_plan.stages.size():
-		_begin_transition(next_stage)
+		day_wins = 0
+		_begin_transition(next_stage, week_plan.stages[next_stage].next_game(0, _last_scene))
 	else:
 		_show_title()
 
@@ -341,7 +359,7 @@ func _clear_active_scene() -> void:
 
 
 func _set_selected_stage(stage_index: int) -> void:
-	_selected_stage = clampi(stage_index, 0, week_plan.stages.size() - 1)
+	_selected_stage = clampi(stage_index, 0, mini(SettingsStore.highest_unlocked_day, week_plan.stages.size() - 1))
 	if not _stage_buttons.is_empty():
 		_stage_buttons[_selected_stage].grab_focus()
 

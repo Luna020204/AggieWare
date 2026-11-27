@@ -37,6 +37,7 @@ func _run_suite(thorough: bool) -> void:
 		await _test_individual_mechanics()
 		await _test_custom_scene_instruction()
 		await _test_native_host_lifecycle()
+	await _test_day_pools()
 	await _test_week_flow()
 	await _test_failure_and_stale_callbacks()
 	if thorough:
@@ -253,13 +254,54 @@ func _test_focus_ramp() -> void:
 		_check(game._ended and game._missed == 0, "Focus difficulty %d completes at its standard duration without artificial misses" % difficulty)
 		await _dispose(game)
 
+func _test_day_pools() -> void:
+	var flow: Variant = _mount_flow()
+	if flow == null:
+		return
+	flow.week_plan = flow.week_plan.duplicate(true)
+	var stage: StageDefinition = flow.week_plan.stages[1]
+	stage.required_wins = 4
+	var first := stage.games[0]
+	var other := stage.games[1]
+	stage.games.assign([first, first.duplicate(), other])
+	_check(stage.next_game(0, first.scene_path) == 2, "Exclude every variant of the previous scene")
+	stage.games.assign([first])
+	_check(stage.next_game(1, first.scene_path) == 0, "Single-game pool remains playable")
+	stage.games.append(other)
+	flow._start_stage(1)
+	var previous: String = stage.games[flow.current_round].scene_path
+	var first_speed: float = flow._active_scene.playback_speed
+	for success: bool in [false, true, true, true, true]:
+		var wins_before: int = flow.day_wins
+		var game: Variant = _prepare_round(flow)
+		DRIVER.finish(game, success)
+		game.round_completed.emit(success)
+		_check(flow.state == flow.FlowState.RESULT and flow.day_wins == wins_before + int(success), "Only the first winning result advances the goal")
+		await _wait_result(flow)
+		if flow.day_wins < stage.win_goal():
+			var preview: String = flow._active_scene.next_prompt
+			_finish_bike(flow)
+			var current: MicrogameDefinition = stage.games[flow.current_round]
+			_check(current.scene_path != previous and current.title == preview, "Bike previews the exact draw; wins and losses avoid repeats")
+			previous = current.scene_path
+			if flow.day_wins > 0:
+				_check(flow._active_scene.playback_speed > first_speed, "Day progress increases play speed")
+	_check(flow.state == flow.FlowState.STAGE_CLEAR and flow.lives == 2 and flow.score == 400, "Four wins from a two-game pool clear after one loss")
+	await _dispose(flow)
+
+
 func _test_week_flow() -> void:
 	var flow: Variant = _mount_flow()
 	if flow == null:
 		return
 	var cleared: Array[int] = []
 	flow.stage_cleared.connect(func(day: int) -> void: cleared.append(day))
+	var store: Node = root.get_node("SettingsStore")
+	store.highest_unlocked_day = 0
 	flow._show_stage_select()
+	_check(flow._stage_buttons[1].disabled, "New week locks Tuesday")
+	flow._start_stage(1)
+	_check(flow.state == flow.FlowState.STAGE_SELECT, "Locked day cannot start from selection")
 	flow._start_stage(0)
 	if not _check(flow.week_plan.stages.size() == 5 and flow.week_plan.stages[0].games.size() == 2, "Default week includes two Monday games and five days"):
 		await _dispose(flow)
@@ -268,33 +310,42 @@ func _test_week_flow() -> void:
 	var saw_crossing := false
 	for day: int in flow.week_plan.stages.size():
 		var stage: Variant = flow.week_plan.stages[day]
-		for round_index: int in stage.games.size():
-			_check(flow.state == flow.FlowState.PLAYING and flow.current_stage == day and flow.current_round == round_index, "Correct day and round are active")
+		for wins: int in stage.win_goal():
+			_check(flow.state == flow.FlowState.PLAYING and flow.current_stage == day and flow.day_wins == wins, "Correct day and round are active")
 			var game: Variant = _prepare_round(flow)
 			if game == null:
 				await _dispose(flow)
 				return
-			_check(game.managed_by_flow and not game.show_internal_timer, "Host owns microgame navigation and timer")
+			_check(game.managed_by_flow and game.show_internal_timer == game.uses_native_hud(), "Host owns microgame navigation and timer")
 			_check(is_instance_valid(flow._hud) and _count_script(flow, HUD_SCRIPT) == 1, "Exactly one shared HUD is mounted")
 			_check(_count_script(flow, PAUSE_SCRIPT) == 1, "Exactly one shared pause overlay is mounted")
-			var kind: String = stage.games[round_index].scene_path.get_file().get_basename()
+			var kind: String = stage.games[flow.current_round].scene_path.get_file().get_basename()
+			if not stage.randomize_games:
+				_check(flow.current_round == wins, "Teaching and finale follow authored order")
+			if day == 0:
+				_check(kind == ["canvas", "crossing"][wins], "Monday teaches Canvas before Crossing")
+			if day == 4:
+				if wins + 1 == stage.win_goal():
+					_check(stage.games[flow.current_round].id == &"canvas_final", "Friday saves the authored final upload for last")
+				_check(game.difficulty == 2, "Friday runs at the hardest tier")
 			saw_crossing = saw_crossing or kind == "crossing"
 			_win_game(kind, game)
-			_check(game._ended, kind + " wins through its game mechanic")
+			_check(game.is_round_finished(), kind + " wins through its game mechanic")
 			completed += 1
 			_check(flow.state == flow.FlowState.RESULT, "Completion immediately enters result state")
 			game.round_completed.emit(true)
 			_check(flow.score == completed * 100 and flow.lives == 3, "Success updates score exactly once")
 			await _wait_result(flow)
-			if round_index + 1 < stage.games.size():
+			if wins + 1 < stage.win_goal():
 				_check(cleared.size() == day, "Day remains open until all of its games finish")
 				_finish_bike(flow)
 			else:
 				_check(flow.state == flow.FlowState.STAGE_CLEAR, "Finishing every game clears the day")
+				_check(store.highest_unlocked_day == mini(day + 1, 4), "Only the next day unlocks")
 				flow._advance_after_clear()
 				if day + 1 < flow.week_plan.stages.size():
 					_finish_bike(flow)
-	_check(saw_crossing and completed == 6, "Complete week plays all six rounds including Crossing")
+	_check(saw_crossing and completed == 12, "Complete week reaches all twelve required wins including Crossing")
 	_check(cleared == [0, 1, 2, 3, 4] and flow.state == flow.FlowState.TITLE, "Friday returns to title with each day cleared once")
 	await _dispose(flow)
 
@@ -330,6 +381,8 @@ func _test_native_host_lifecycle() -> void:
 	flow.week_plan = flow.week_plan.duplicate(true)
 	# Native games are supported in an authored WeekPlan, not only the launcher.
 	for kind: String in NATIVE_KINDS:
+		flow.week_plan.stages[1].games.resize(1)
+		flow.week_plan.stages[1].required_wins = 1
 		flow.week_plan.stages[1].games[0].scene_path = GAME_PATHS[kind]
 		flow._start_stage(1)
 		var session: Variant = flow._active_scene

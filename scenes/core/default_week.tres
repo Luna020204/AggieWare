@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="WeekPlan" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="WeekPlan" load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/week_plan.gd" id="1_week"]
 [ext_resource type="Script" path="res://scripts/core/stage_definition.gd" id="2_day"]
@@ -52,30 +52,69 @@ prompt = "SUBMIT"
 scene_path = "res://scenes/microgames/canvas.tscn"
 difficulty = 2
 
+[sub_resource type="Resource" id="Game_swipe"]
+script = ExtResource("3_game")
+id = &"swipe"
+title = "Swipe Card"
+prompt = "SWIPE"
+scene_path = "res://scenes/microgames/swipe_card.tscn"
+
+[sub_resource type="Resource" id="Game_scope"]
+script = ExtResource("3_game")
+id = &"scope"
+title = "Variable Not in Scope"
+prompt = "FIX"
+scene_path = "res://scenes/microgames/variable_scope.tscn"
+
+[sub_resource type="Resource" id="Game_awake"]
+script = ExtResource("3_game")
+id = &"awake"
+title = "Stay Awake"
+prompt = "POP"
+scene_path = "res://scenes/microgames/stay_awake.tscn"
+
+[sub_resource type="Resource" id="Game_microscope"]
+script = ExtResource("3_game")
+id = &"microscope"
+title = "Microscope"
+prompt = "FIND"
+scene_path = "res://scenes/microgames/microscope.tscn"
+
 [sub_resource type="Resource" id="Day_monday"]
 script = ExtResource("2_day")
 title = "MONDAY"
+theme = "Orientation"
 games = Array[ExtResource("3_game")]([SubResource("Game_monday_canvas"), SubResource("Game_crossing")])
 
 [sub_resource type="Resource" id="Day_tuesday"]
 script = ExtResource("2_day")
 title = "TUESDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_schedule")])
+theme = "Campus errands"
+randomize_games = true
+required_wins = 2
+games = Array[ExtResource("3_game")]([SubResource("Game_schedule"), SubResource("Game_swipe"), SubResource("Game_crossing")])
 
 [sub_resource type="Resource" id="Day_wednesday"]
 script = ExtResource("2_day")
 title = "WEDNESDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_focus")])
+theme = "Lecture hall"
+randomize_games = true
+required_wins = 2
+games = Array[ExtResource("3_game")]([SubResource("Game_focus"), SubResource("Game_scope"), SubResource("Game_awake"), SubResource("Game_microscope")])
 
 [sub_resource type="Resource" id="Day_thursday"]
 script = ExtResource("2_day")
 title = "THURSDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_gates")])
+theme = "Lab challenges"
+randomize_games = true
+required_wins = 3
+games = Array[ExtResource("3_game")]([SubResource("Game_gates"), SubResource("Game_scope"), SubResource("Game_microscope")])
 
 [sub_resource type="Resource" id="Day_friday"]
 script = ExtResource("2_day")
 title = "FRIDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_friday_canvas")])
+theme = "ECS 179 final"
+games = Array[ExtResource("3_game")]([SubResource("Game_focus"), SubResource("Game_gates"), SubResource("Game_friday_canvas")])
 
 [resource]
 script = ExtResource("1_week")

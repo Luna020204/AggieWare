@@ -6,17 +6,17 @@ An ECS 179 collection of short games about student life at UC Davis. Nine microg
 
 Use **Godot 4.7.2-stable**, standard edition, with the GL Compatibility renderer. Import `project.godot` and press **F5**. The viewport is 1280 × 720.
 
-The default week preserves six rounds across five days:
+Clear each day to unlock the next. Unlocked days are saved between sessions.
 
-| Day | Rounds | Difficulty |
-| --- | --- | --- |
-| Monday | Canvas Upload → Campus Crossing | Easy, Easy |
-| Tuesday | Schedule Builder | Easy |
-| Wednesday | Stay Focused | Normal |
-| Thursday | Logic Gates | Normal |
-| Friday | Canvas Final Upload | Hard |
+| Day | Games | Wins to clear |
+| --- | --- | ---: |
+| Monday | Canvas Upload → Campus Crossing, in order | 2 |
+| Tuesday | Draw from Schedule Builder, Swipe Card, Campus Crossing | 2 |
+| Wednesday | Draw from Stay Focused, Variable Not in Scope, Stay Awake, Microscope | 2 |
+| Thursday | Draw from Logic Gates, Variable Not in Scope, Microscope | 3 |
+| Friday | Stay Focused → Logic Gates → Canvas Final Upload, all on hard | 3 |
 
-Each successful round earns 100 points; failure costs one of three lives and retries that round after the bike transition. Day clear follows the last round of a day. Game over offers a fresh attempt at that day. Score, lives, and day sequencing remain host state. Each game retains its own gameplay presentation.
+Each win earns 100 points. A loss costs one life and keeps the day's win count. On a pool day the next draw excludes the last scene whenever another scene is available. On an ordered day the player retries the same challenge. At zero lives, retry starts that day with three lives and zero score and wins. The bike preview shows the exact upcoming game. Speed increases as the week advances, with timer assist applied during play.
 
 All nine scenes also support independent **F6** play:
 
@@ -86,10 +86,10 @@ godot --path . res://scenes/debug/microgame_launcher.tscn -- --microgame=swipe -
 Open `scenes/core/game_flow.tscn`, select **GameFlow**, and expand **Week Plan**. Its resource is `scenes/core/default_week.tres`.
 
 - `WeekPlan.Stages` contains ordered day resources.
-- Each `StageDefinition` has a **Title** and an ordered **Games** array.
+- Each `StageDefinition` has a **Title**, **Theme**, **Games**, **Randomize Games** and **Required Wins**. Enable randomization to draw from the pool after every attempt. Zero required wins defaults to the list length. Ordered days play the entire list in order.
 - Each `MicrogameDefinition` sets **Id**, **Title**, **Prompt**, **Scene Path**, **Difficulty**, and **Round Seconds Override**. Zero uses the game's normal duration. A nonzero override applies to framework games; preserved native games retain their authored duration and issue a warning instead.
 
-To add a round, extend a day's Games array, create a `MicrogameDefinition`, and assign a microgame scene path. Reorder the arrays to change the sequence. Save the resource and test with F5. Use **Make Unique** before changing duplicated resources independently. Keep at least one round per day. The flow automatically transitions between rounds and waits for all rounds before day clear.
+To add a round, extend a day's Games array, create a `MicrogameDefinition`, and assign a microgame scene path. Reorder the arrays to change the sequence. Save the resource and test with F5. Use **Make Unique** before changing duplicated resources independently. Keep at least one round per day. The flow waits for the result presentation before moving on or clearing the day at its win goal.
 
 ## Author crossing levels
 
