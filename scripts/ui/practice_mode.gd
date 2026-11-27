@@ -82,7 +82,11 @@ func _completed(success: bool, run: int) -> void:
 	result.text = "SUCCESS! Play again?" if success else "TRY AGAIN! No lives lost."
 
 func _finished(run: int) -> void:
-	if run == token: stop.call_deferred()
+	_stop_finished_run.call_deferred(run)
+
+func _stop_finished_run(run: int) -> void:
+	# Recheck when deferred work runs: the player may already have replayed.
+	if run == token: stop()
 
 func stop() -> void:
 	token += 1

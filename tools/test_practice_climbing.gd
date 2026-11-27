@@ -74,6 +74,13 @@ func run() -> void:
 		practice._finished(obsolete)
 		check(practice.active != null, "Old callback cannot stop a replay")
 		practice.stop()
+	practice.launch()
+	practice._finished(practice.token)
+	practice.launch()
+	var newest = practice.active
+	await process_frame
+	check(is_instance_valid(newest) and practice.active == newest, "Queued result cannot cancel a newer replay")
+	practice.stop()
 	check(flow.lives == 2 and flow.score == 400, "Practice preserves week lives and score")
 	practice.exited.emit()
 	check(flow.state == flow.FlowState.TITLE, "Exit returns to title")
