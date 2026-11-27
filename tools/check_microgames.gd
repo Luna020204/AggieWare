@@ -17,9 +17,9 @@ func _run() -> void:
 	_catalog = load("res://scripts/core/microgame_catalog.gd")
 	root.get_node("GameState").set_setting(&"timer_assist", 1.0)
 	print("microgame              diff    contract tick timeout          win  fail")
-	if _catalog.ENTRIES.size() != 9:
+	if _catalog.ENTRIES.size() != 10:
 		_failures += 1
-		push_error("Catalog must contain all nine integrated microgames.")
+		push_error("Catalog must contain all ten integrated microgames.")
 	for entry: Dictionary in _catalog.ENTRIES:
 		for difficulty: int in 3:
 			await _check_one(entry, difficulty)
@@ -118,7 +118,11 @@ func _check_launcher() -> void:
 				problems.append("introduction did not precede assisted play for " + entry["id"])
 		elif not game.is_playing() or not is_equal_approx(Engine.time_scale, 1.5):
 			problems.append("native game without introduction did not start immediately: " + entry["id"])
-		if game.game_title != str(entry["title"]).to_upper() or game.instruction_text != entry["instruction"]:
+		var expected_instruction: String = entry["instruction"]
+		if entry["id"] == "climbing":
+			var actions = root.get_node("InputActions")
+			expected_instruction = "ROTATE %s / %s. %s: GRAB." % [actions.action_label(actions.ACTION_LEFT), actions.action_label(actions.ACTION_RIGHT), actions.action_label(actions.ACTION_MASH)]
+		if game.game_title != str(entry["title"]).to_upper() or game.instruction_text != expected_instruction:
 			problems.append("introduction metadata missing for " + entry["id"])
 		game.skip_intro()
 		if not game.can_interact() or not is_equal_approx(Engine.time_scale, 1.5):

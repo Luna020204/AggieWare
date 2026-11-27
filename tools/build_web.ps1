@@ -45,7 +45,7 @@ $version = Invoke-GodotCheck 'version' @('--headless', '--version')
 if ($version -notmatch '(?m)^4\.7\.2\.') { throw 'This build requires Godot 4.7.2.' }
 $null = Invoke-GodotCheck 'import' @('--headless', '--path', '.', '--import')
 if (-not $SkipTests) {
-    foreach ($test in @('smoke_flow', 'test_collection', 'test_input_routes', 'test_presentation', 'check_microgames', 'smoke_variable_scope', 'smoke_new_microgames', 'smoke_accessibility')) {
+    foreach ($test in @('smoke_flow', 'test_collection', 'test_input_routes', 'test_presentation', 'check_microgames', 'smoke_variable_scope', 'smoke_new_microgames', 'smoke_accessibility', 'test_practice_climbing')) {
         $null = Invoke-GodotCheck $test @('--headless', '--path', '.', '--script', "res://tools/$test.gd") '(?m)^[A-Z_]+_OK\s*$'
     }
     $null = Invoke-GodotCheck 'crossing_framework' @('--headless', '--path', '.', '--script', 'res://tests/crossing/test_framework.gd') 'RESULT: \d+ checks, 0 failures'

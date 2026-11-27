@@ -3,6 +3,7 @@ extends SceneTree
 ## godot --headless --path . --script res://tools/test_collection.gd
 
 const GAME_PATHS := {
+	"rock_climbing": "res://scenes/microgames/rock_climbing.tscn",
 	"canvas": "res://scenes/microgames/canvas.tscn",
 	"schedule_builder": "res://scenes/microgames/schedule_builder.tscn",
 	"stay_focused": "res://scenes/microgames/stay_focused.tscn",
@@ -578,6 +579,11 @@ func _win_game(kind: String, session: Variant) -> void:
 				game.pop_z(z)
 			game._seconds_left = 0.005
 			game._process(0.01)
+		"rock_climbing":
+			while not session.is_round_finished():
+				session.angle = (session.holds[session.reached+1] - session.holds[session.reached]).angle() + PI/2
+				session.cooldown = 0.0
+				session.try_latch()
 		"microscope":
 			game.camera = game._target_pos
 			game.confirm()

@@ -7,7 +7,7 @@ signal microgame_requested(stage_index: int)
 signal stage_cleared(stage_index: int)
 signal game_over
 
-enum FlowState { TITLE, STAGE_SELECT, PLAYING, RESULT, TRANSITION, STAGE_CLEAR, GAME_OVER }
+enum FlowState { TITLE, STAGE_SELECT, PLAYING, RESULT, TRANSITION, STAGE_CLEAR, GAME_OVER, PRACTICE }
 
 const BIKE_SCENE := preload("res://scenes/core/bike_transition.tscn")
 const HUD_SCENE := preload("res://scenes/ui/game_hud.tscn")
@@ -135,6 +135,7 @@ func _show_title() -> void:
 	start_button.add_theme_font_size_override("font_size", 28)
 	UI.shadow(start_button, 28)
 	start_button.grab_focus()
+	_add_button("Practice", _show_practice)
 	_add_message("Use the arrow keys / WASD to choose · Confirm to continue")
 
 
@@ -395,3 +396,13 @@ func _panel_style(background: Color, border: Color) -> StyleBoxFlat:
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(12)
 	return style
+
+
+func _show_practice() -> void:
+	_clear_active_scene()
+	_center.hide()
+	state = FlowState.PRACTICE
+	var practice := preload("res://scripts/ui/practice_mode.gd").new()
+	practice.exited.connect(_show_title)
+	_active_scene = practice
+	add_child(practice)

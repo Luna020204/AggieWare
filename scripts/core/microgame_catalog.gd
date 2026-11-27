@@ -3,6 +3,7 @@ extends RefCounted
 ## Debug catalog and shared introduction metadata. The WeekPlan owns day order.
 
 const ENTRIES: Array[Dictionary] = [
+	{"id":"climbing", "title":"ARC Rock Climbing", "day":"ARC / Recreation", "scene":"res://scenes/microgames/rock_climbing.tscn", "verb":"CLIMB!", "icon":"arrows_lr", "instruction":"ROTATE LEFT / RIGHT. ACTION: GRAB."},
 	{"id": "canvas", "title": "Canvas Upload", "day": "Mon / Fri", "scene": "res://scenes/microgames/canvas.tscn", "verb": "UPLOAD!", "icon": "drag", "instruction": "DRAG FILE.ZIP, THEN SUBMIT."},
 	{"id": "crossing", "title": "Campus Crossing", "day": "Mon", "scene": "res://scenes/microgames/crossing.tscn", "verb": "CROSS!", "icon": "arrows", "instruction": "DODGE TRAFFIC. REACH THE FLAG."},
 	{"id": "schedule", "title": "Schedule Builder", "day": "Tue", "scene": "res://scenes/microgames/schedule_builder.tscn", "verb": "REGISTER!", "icon": "click", "instruction": "WAIT FOR 8:00, THEN REGISTER."},
