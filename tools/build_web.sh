@@ -39,7 +39,7 @@ run_godot() {
 run_godot version '^4\.7\.2\.' --headless --version
 run_godot import '' --headless --path . --import
 if [[ "${SKIP_TESTS:-0}" != "1" ]]; then
-  for test in smoke_flow test_collection test_input_routes test_presentation check_microgames smoke_variable_scope smoke_new_microgames smoke_accessibility; do
+  for test in smoke_flow test_collection test_input_routes test_presentation check_microgames smoke_variable_scope smoke_new_microgames smoke_accessibility test_music_tempo; do
     run_godot "$test" '^[A-Z_]+_OK[[:space:]]*$' --headless --path . --script "res://tools/$test.gd"
   done
   run_godot crossing_framework 'RESULT: [0-9]+ checks, 0 failures' --headless --path . --script res://tests/crossing/test_framework.gd

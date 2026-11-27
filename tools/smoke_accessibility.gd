@@ -73,7 +73,9 @@ func _accessibility_options() -> void:
 
 	# Turning symbols off still preserves mandatory text and its presentation time.
 	_gs().set_setting(&"result_cues", false)
-	flow._start_stage(3)
+	flow.week_plan = flow.week_plan.duplicate(true)
+	flow.week_plan.stages[3].required_wins = 1
+	flow._start_round(3, 0)
 	game = flow._active_scene
 	game.set_process(false)
 	game.skip_intro()
@@ -265,14 +267,19 @@ func _control_options() -> void:
 	var retry_key := InputEventKey.new()
 	retry_key.physical_keycode = KEY_T
 	store.rebind(&"game_retry", retry_key)
+	store.highest_unlocked_day = 0
+	store.unlock_day(3)
+	store.unlock_day(1)
 	store.save_settings()
 	# Simulate a fresh session: wipe the in-memory state without auto-saving.
 	store._loading = true
+	store.highest_unlocked_day = 0
 	InputActions_reset_all()
 	_gs().set_setting(&"timer_assist", 1.0)
 	_gs().set_setting(&"mash_hold", false)
 	store._loading = false
 	store.load_settings()
+	_assert(store.highest_unlocked_day == 3, "Cleared days survive reload and replaying an earlier day")
 	_assert(_bound(&"game_up", KEY_I), "controls: rebinding not restored from the settings file")
 	_assert(_bound(&"game_retry", KEY_T), "controls: standalone retry binding was not restored")
 	_assert(is_equal_approx(float(_gs().get_setting(&"timer_assist")), 1.5) and _gs().get_setting(&"mash_hold") == true, "controls: options not restored from the settings file")
@@ -283,6 +290,7 @@ func _control_options() -> void:
 	malformed.set_value("bindings", "game_down", [KEY_NONE, KEY_ESCAPE, "invalid"])
 	malformed.save(TEST_SETTINGS)
 	store.load_settings()
+	_assert(store.highest_unlocked_day == 0, "Older saves without day progress start on Monday")
 	_assert(_bound(&"game_up", KEY_I) and _bound(&"game_down", KEY_S), "controls: malformed saved bindings preserve valid controls")
 	_assert(is_equal_approx(Accessibility.timer_assist(), 1.5) and _gs().get_setting(&"mash_hold") == true, "controls: malformed saved options preserve valid settings")
 
