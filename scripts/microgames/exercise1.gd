@@ -15,7 +15,7 @@ func get_round_seconds() -> float:
 
 
 func _build_ui() -> void:
-	var header := UI.build_header(self, "BOSS BATTLE", "ONE SHOT TO DEFEAT THE BOSS", show_internal_timer)
+	var header := UI.build_header(self, "EXERCISE 1", "STRIKE THE BOSS AT THE RIGHT TIME", show_internal_timer)
 	_timer_label = header.timer
 	
 func _reset_game() -> void:

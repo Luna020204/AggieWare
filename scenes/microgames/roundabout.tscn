@@ -111,9 +111,9 @@ size = Vector2(65.20001, 27.600006)
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_vwdv0")
-prompt = "COMPLETE"
+prompt = "STEER"
 game_title = "ROUNDABOUT"
-instruction_text = "THE ROUNDABOUT CORRECTLY"
+instruction_text = "STEER THROUGH THE ROUNDABOUT CORRECTLY."
 
 [node name="World" type="Node2D" parent="." unique_id=1495207549]
 

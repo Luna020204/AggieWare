@@ -1075,9 +1075,9 @@ size = Vector2(30.599995, 34.999985)
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_1lrg3")
-prompt = "SLASH"
+prompt = "DEFEAT"
 game_title = "EXERCISE 1"
-instruction_text = "THE BOSS"
+instruction_text = "STRIKE THE BOSS AT THE RIGHT TIME."
 
 [node name="World" type="Node2D" parent="." unique_id=1495207549]
 
@@ -1126,7 +1126,7 @@ scale = Vector2(5, 5)
 sprite_frames = SubResource("SpriteFrames_lm4sj")
 animation = &"Walk"
 autoplay = "Walk"
-frame_progress = 0.0017473698
+frame_progress = 0.274426
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="World/Bringer" unique_id=1725791088]
 position = Vector2(1076, 419)

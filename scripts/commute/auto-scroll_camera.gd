@@ -13,6 +13,13 @@ func _ready() -> void:
 
 	can_move = true
 	microgame.microgame_end.connect(_on_end)
+	
+	if microgame.difficulty == 0:
+		speed = 325
+	elif microgame.difficulty == 1:
+		speed = 350
+	elif microgame.difficulty == 2:
+		speed = 375
 
 #360 camera y, 720 is lower boundary
 
