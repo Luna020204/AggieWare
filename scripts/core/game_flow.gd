@@ -126,6 +126,7 @@ func _show_title() -> void:
 	_clear_active_scene()
 	_center.show()
 	state = FlowState.TITLE
+	AudioManager.play_title_music()
 	_header_label.text = "AGGIEWARE"
 	_subtitle_label.text = "A week of tiny games at UC Davis"
 	_clear_content()
@@ -196,8 +197,11 @@ func _start_round(stage_index: int, round_index: int) -> void:
 	microgame.round_completed.connect(_on_round_completed.bind(_run_token))
 	microgame.time_changed.connect(_on_round_time_changed.bind(_run_token))
 	microgame.result_finished.connect(_on_result_finished.bind(_run_token))
+	if microgame.has_signal("gameplay_started"):
+		microgame.connect("gameplay_started", _on_gameplay_started.bind(_run_token))
 	current_prompt = definition.prompt
 	state = FlowState.PLAYING
+	AudioManager.set_progress(_calculate_week_progress(current_stage, current_round, 0.0))
 	_center.hide()
 	_clear_content()
 	# The HUD is ready before the game's initial time_changed signal fires.
@@ -221,9 +225,28 @@ func _prompt_for_stage(stage_index: int, round_index: int = 0) -> String:
 func _on_round_time_changed(seconds_left: float, round_seconds: float, token: int = -1) -> void:
 	if token != -1 and token != _run_token:
 		return
+	if state == FlowState.PLAYING:
+		var elapsed_fraction := 1.0 - (seconds_left / maxf(round_seconds, 0.01))
+		AudioManager.set_progress(_calculate_week_progress(current_stage, current_round, elapsed_fraction))
 	if (state == FlowState.PLAYING or state == FlowState.RESULT) and is_instance_valid(_hud):
 		var stage := week_plan.stages[current_stage]
 		_hud.set_round_status(seconds_left, round_seconds, lives, score, current_stage, week_plan.stages.size(), current_round, stage.games.size(), stage.games[current_round].title)
+
+
+func _on_gameplay_started(token: int = -1) -> void:
+	if token != -1 and token != _run_token:
+		return
+	if state == FlowState.PLAYING:
+		AudioManager.play_gameplay_music()
+
+
+func _calculate_week_progress(stage_index: int, round_index: int, round_fraction: float) -> float:
+	if week_plan == null or week_plan.stages.is_empty():
+		return 0.0
+	var stage := week_plan.stages[stage_index]
+	var rounds_in_stage := maxi(stage.games.size(), 1)
+	var stage_progress := (float(round_index) + clampf(round_fraction, 0.0, 1.0)) / float(rounds_in_stage)
+	return clampf((float(stage_index) + stage_progress) / float(week_plan.stages.size()), 0.0, 1.0)
 
 
 func _on_round_completed(success: bool, token: int = -1) -> void:
@@ -233,6 +256,10 @@ func _on_round_completed(success: bool, token: int = -1) -> void:
 	# callbacks from an earlier run cannot award points or remove lives twice.
 	state = FlowState.RESULT
 	_round_success = success
+	if success:
+		AudioManager.play_win()
+	else:
+		AudioManager.play_lose()
 	if success:
 		score += 100
 	else:
@@ -281,6 +308,7 @@ func show_stage_clear(_next_stage_index: int = -1) -> void:
 	_clear_active_scene()
 	_center.show()
 	state = FlowState.STAGE_CLEAR
+	AudioManager.play_stage_clear()
 	_header_label.text = "DAY CLEAR!"
 	_subtitle_label.text = "%s complete · Score: %d" % [week_plan.stages[current_stage].title, score]
 	_clear_content()
@@ -298,6 +326,7 @@ func show_game_over() -> void:
 	_clear_active_scene()
 	_center.show()
 	state = FlowState.GAME_OVER
+	AudioManager.play_game_over()
 	_header_label.text = "GAME OVER"
 	_subtitle_label.text = "%s · Final score: %d" % [week_plan.stages[current_stage].title, score]
 	_clear_content()

@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dg50rc5gecb3o"]
 
-[ext_resource type="Script" path="res://scripts/microgames/canvas.gd" id="1_canvas"]
+[ext_resource type="Script" uid="uid://j07ssvwlxvyq" path="res://scripts/microgames/canvas.gd" id="1_canvas"]
 
-[node name="CanvasMicrogame" type="Control"]
+[node name="CanvasMicrogame" type="Control" unique_id=540771061]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

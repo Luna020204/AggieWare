@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dyxr1gphka8hc"]
 
-[ext_resource type="Script" path="res://scripts/core/bike_transition.gd" id="1_bike_transition"]
+[ext_resource type="Script" uid="uid://b3h8ff0cav5sb" path="res://scripts/core/bike_transition.gd" id="1_bike_transition"]
 
-[node name="BikeTransition" type="Control"]
+[node name="BikeTransition" type="Control" unique_id=905096921]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

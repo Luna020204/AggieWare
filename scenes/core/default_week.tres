@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="WeekPlan" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="WeekPlan" format=3 uid="uid://cc36xcyxxrunn"]
 
-[ext_resource type="Script" path="res://scripts/core/week_plan.gd" id="1_week"]
-[ext_resource type="Script" path="res://scripts/core/stage_definition.gd" id="2_day"]
-[ext_resource type="Script" path="res://scripts/core/microgame_definition.gd" id="3_game"]
+[ext_resource type="Script" uid="uid://d3k1i5hfaeho" path="res://scripts/core/week_plan.gd" id="1_week"]
+[ext_resource type="Script" uid="uid://ckg2x8nxk77xn" path="res://scripts/core/stage_definition.gd" id="2_day"]
+[ext_resource type="Script" uid="uid://dncrdgrideo3n" path="res://scripts/core/microgame_definition.gd" id="3_game"]
 
 [sub_resource type="Resource" id="Game_monday_canvas"]
 script = ExtResource("3_game")
@@ -10,7 +10,6 @@ id = &"canvas"
 title = "Canvas Upload"
 prompt = "UPLOAD"
 scene_path = "res://scenes/microgames/canvas.tscn"
-difficulty = 0
 
 [sub_resource type="Resource" id="Game_crossing"]
 script = ExtResource("3_game")
@@ -18,7 +17,11 @@ id = &"crossing"
 title = "Campus Crossing"
 prompt = "CROSS"
 scene_path = "res://scenes/microgames/crossing.tscn"
-difficulty = 0
+
+[sub_resource type="Resource" id="Day_monday"]
+script = ExtResource("2_day")
+title = "MONDAY"
+games = Array[ExtResource("3_game")]([SubResource("Game_monday_canvas"), SubResource("Game_crossing")])
 
 [sub_resource type="Resource" id="Game_schedule"]
 script = ExtResource("3_game")
@@ -26,7 +29,11 @@ id = &"schedule"
 title = "Schedule Builder"
 prompt = "REGISTER"
 scene_path = "res://scenes/microgames/schedule_builder.tscn"
-difficulty = 0
+
+[sub_resource type="Resource" id="Day_tuesday"]
+script = ExtResource("2_day")
+title = "TUESDAY"
+games = Array[ExtResource("3_game")]([SubResource("Game_schedule")])
 
 [sub_resource type="Resource" id="Game_focus"]
 script = ExtResource("3_game")
@@ -36,6 +43,11 @@ prompt = "FOCUS"
 scene_path = "res://scenes/microgames/stay_focused.tscn"
 difficulty = 1
 
+[sub_resource type="Resource" id="Day_wednesday"]
+script = ExtResource("2_day")
+title = "WEDNESDAY"
+games = Array[ExtResource("3_game")]([SubResource("Game_focus")])
+
 [sub_resource type="Resource" id="Game_gates"]
 script = ExtResource("3_game")
 id = &"gates"
@@ -44,6 +56,11 @@ prompt = "CONNECT"
 scene_path = "res://scenes/microgames/gates.tscn"
 difficulty = 1
 
+[sub_resource type="Resource" id="Day_thursday"]
+script = ExtResource("2_day")
+title = "THURSDAY"
+games = Array[ExtResource("3_game")]([SubResource("Game_gates")])
+
 [sub_resource type="Resource" id="Game_friday_canvas"]
 script = ExtResource("3_game")
 id = &"canvas_final"
@@ -51,26 +68,6 @@ title = "Canvas Final Upload"
 prompt = "SUBMIT"
 scene_path = "res://scenes/microgames/canvas.tscn"
 difficulty = 2
-
-[sub_resource type="Resource" id="Day_monday"]
-script = ExtResource("2_day")
-title = "MONDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_monday_canvas"), SubResource("Game_crossing")])
-
-[sub_resource type="Resource" id="Day_tuesday"]
-script = ExtResource("2_day")
-title = "TUESDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_schedule")])
-
-[sub_resource type="Resource" id="Day_wednesday"]
-script = ExtResource("2_day")
-title = "WEDNESDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_focus")])
-
-[sub_resource type="Resource" id="Day_thursday"]
-script = ExtResource("2_day")
-title = "THURSDAY"
-games = Array[ExtResource("3_game")]([SubResource("Game_gates")])
 
 [sub_resource type="Resource" id="Day_friday"]
 script = ExtResource("2_day")

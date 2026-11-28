@@ -6,6 +6,7 @@ extends Control
 signal round_completed(success: bool)
 signal time_changed(seconds_left: float, round_seconds: float)
 signal result_finished
+signal gameplay_started
 
 @export_range(0, 2, 1) var difficulty := 0
 @export var managed_by_flow := true
@@ -157,6 +158,7 @@ func _refresh_play_state() -> void:
 		return
 	if native_game.is_inside_tree() and _native_intro_remaining() <= 0.0:
 		_playing_started = true
+		gameplay_started.emit()
 		Accessibility.begin_microgame(playback_speed, self)
 
 
