@@ -1,14 +1,18 @@
 [gd_resource type="Resource" script_class="AudioLibrary" format=3 uid="uid://bt70i0uyydscj"]
 
 [ext_resource type="Script" uid="uid://kqp7pxr3mmgr" path="res://scripts/core/audio_library.gd" id="1_audio_library"]
-[ext_resource type="AudioStream" uid="uid://c4pihyulnu661" path="res://audio/music/8 bit aggie.mp3" id="2_tfmfj"]
+[ext_resource type="AudioStream" uid="uid://dy6en667mt4ce" path="res://audio/music/gameover.mp3" id="1_cbwqd"]
+[ext_resource type="AudioStream" uid="uid://so5gvgbdmrmc" path="res://audio/music/lose.mp3" id="1_geqqb"]
+[ext_resource type="AudioStream" uid="uid://br42hpen4ma0t" path="res://audio/music/8 bit gameplay.mp3" id="2_wdse5"]
+[ext_resource type="AudioStream" uid="uid://b63f4ce0fwjqm" path="res://audio/music/8 bit aggienew.mp3" id="3_c4kn6"]
+[ext_resource type="AudioStream" uid="uid://c1bg0kiljorv2" path="res://audio/music/victory.mp3" id="3_xf70o"]
+[ext_resource type="AudioStream" uid="uid://cjo2mhauhhkvg" path="res://audio/music/win.mp3" id="4_c4kn6"]
 
 [resource]
 script = ExtResource("1_audio_library")
-title_music = ExtResource("2_tfmfj")
-gameplay_music = ExtResource("2_tfmfj")
-startup_jingle = ExtResource("2_tfmfj")
-win_jingle = ExtResource("2_tfmfj")
-lose_jingle = ExtResource("2_tfmfj")
-stage_clear_jingle = ExtResource("2_tfmfj")
-game_over_jingle = ExtResource("2_tfmfj")
+title_music = ExtResource("3_c4kn6")
+gameplay_music = ExtResource("2_wdse5")
+win_jingle = ExtResource("4_c4kn6")
+lose_jingle = ExtResource("1_geqqb")
+stage_clear_jingle = ExtResource("3_xf70o")
+game_over_jingle = ExtResource("1_cbwqd")
