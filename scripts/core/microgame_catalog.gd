@@ -12,6 +12,10 @@ const ENTRIES: Array[Dictionary] = [
 	{"id": "swipe", "title": "Swipe Card", "day": "Rush Hour", "scene": "res://scenes/microgames/swipe_card.tscn", "verb": "SWIPE!", "icon": "drag", "instruction": "FIND YOUR AGGIE CARD, THEN SWIPE!"},
 	{"id": "awake", "title": "Stay Awake", "day": "Lecture Hall", "scene": "res://scenes/microgames/stay_awake.tscn", "verb": "POP!", "icon": "click", "instruction": "CLICK EVERY Z BEFORE IT HITS."},
 	{"id": "microscope", "title": "Microscope", "day": "Lecture Hall", "scene": "res://scenes/microgames/microscope.tscn", "verb": "FIND!", "icon": "arrows", "instruction": "CENTER THE GOLD AGGIE BACTERIA."},
+	{"id": "commute", "title": "Commute", "day": "Mon", "scene": "res://scenes/microgames/commute.tscn", "verb": "COMMUTE!", "icon": "arrows", "instruction": "DRIVE THROUGH TRAFFIC SAFELY."},
+	{"id": "roundabout", "title": "Roundabout", "day": "Mon", "scene": "res://scenes/microgames/roundabout.tscn", "verb": "STEER!", "icon": "arrows", "instruction": "STEER THROUGH THE ROUNDABOUT CORRECTLY."},
+	{"id": "motion_input", "title": "Motion Input", "day": "Fri", "scene": "res://scenes/microgames/motion_input.tscn", "verb": "EXECUTE!", "icon": "arrows", "instruction": "PERFORM CORRECT INPUTS IN SEQUENCE."},
+	{"id": "exercise1", "title": "Exercise 1", "day": "Fri", "scene": "res://scenes/microgames/exercise1.tscn", "verb": "DEFEAT!", "icon": "click", "instruction": "STRIKE THE BOSS AT THE RIGHT TIME."},
 ]
 
 const DIFFICULTY_NAMES: Array[String] = ["EASY", "NORMAL", "HARD"]
